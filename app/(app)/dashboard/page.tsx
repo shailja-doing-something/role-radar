@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { LayoutDashboard, ExternalLink, MapPin, DollarSign } from "lucide-react";
 import { DashboardCharts } from "./charts";
+import { ScrapeButton } from "./scrape-button";
 
 export default async function DashboardPage() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -63,10 +64,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-8">
-      <h1 className="flex items-center gap-2 text-2xl font-bold text-white mb-6">
-        <LayoutDashboard size={22} className="text-blue-400" />
-        Dashboard
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+          <LayoutDashboard size={22} className="text-blue-400" />
+          Dashboard
+        </h1>
+        <ScrapeButton />
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
