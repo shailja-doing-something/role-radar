@@ -1,46 +1,44 @@
 import { scrapeAll, healthCheckDisabled } from "@/lib/scraper";
 import { prisma } from "@/lib/prisma";
-import { analyzePatterns } from "@/lib/roles";
 
-const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+// ── Frequency map ─────────────────────────────────────────────────────────────
 
+export const FREQUENCY_MS: Record<string, number> = {
+  "6h":    6  * 60 * 60 * 1000,
+  "12h":  12  * 60 * 60 * 1000,
+  "daily": 24 * 60 * 60 * 1000,
+  "weekly": 7 * 24 * 60 * 60 * 1000,
+};
+
+export const FREQUENCY_LABELS: Record<string, string> = {
+  "6h":    "every 6 hours",
+  "12h":   "every 12 hours",
+  "daily": "daily",
+  "weekly": "weekly",
+};
+
+// ── Module-level state ────────────────────────────────────────────────────────
+
+let schedulerTimer: ReturnType<typeof setInterval> | null = null;
 let running = false;
 
-async function runPatternAnalysis() {
-  try {
-    const postings = await prisma.jobPosting.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      select: { title: true, description: true },
-    });
-    if (postings.length === 0) return;
-
-    const extracted = await analyzePatterns(postings);
-    const period = new Date().toISOString().slice(0, 7);
-
-    for (const pattern of extracted) {
-      await prisma.pattern.upsert({
-        where: { keyword_period: { keyword: pattern.keyword, period } },
-        create: { keyword: pattern.keyword, category: pattern.category, count: pattern.count, period },
-        update: { count: pattern.count },
-      });
-    }
-    console.log(`[Scheduler] Pattern analysis: ${extracted.length} patterns updated.`);
-  } catch (error) {
-    console.error("[Scheduler] Pattern analysis failed:", error);
-  }
-}
+// ── Tick ─────────────────────────────────────────────────────────────────────
 
 async function tick() {
-  if (running) return;
+  if (running) {
+    console.log("[Scheduler] Already running — skipping this tick");
+    return;
+  }
   running = true;
   console.log("[Scheduler] Starting scrape cycle...");
   try {
     await scrapeAll();
-    console.log("[Scheduler] Scrape cycle complete. Running health checks on disabled sources...");
+    console.log("[Scheduler] Scrape done. Running health checks...");
     await healthCheckDisabled();
     console.log("[Scheduler] Health checks done. Running pattern analysis...");
-    await runPatternAnalysis();
+    // Pattern analysis is imported lazily to avoid circular deps at module init time
+    const { runAnalysis } = await import("@/lib/analysis");
+    await runAnalysis();
   } catch (error) {
     console.error("[Scheduler] Scrape cycle failed:", error);
   } finally {
@@ -48,9 +46,40 @@ async function tick() {
   }
 }
 
-export function startScheduler(): void {
-  console.log("[Scheduler] Started. Next run in 6 hours.");
-  // Run after a short delay on startup to avoid blocking server init
-  setTimeout(tick, 5000);
-  setInterval(tick, INTERVAL_MS);
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Stop the currently running scheduler (no-op if already stopped). */
+export function stopScheduler(): void {
+  if (schedulerTimer) {
+    clearInterval(schedulerTimer);
+    schedulerTimer = null;
+    console.log("[Scheduler] Stopped");
+  }
+}
+
+/** Start (or restart) the scheduler with the given interval in milliseconds. */
+export function startScheduler(frequencyMs: number): void {
+  stopScheduler();
+  schedulerTimer = setInterval(tick, frequencyMs);
+  const hours = frequencyMs / (60 * 60 * 1000);
+  console.log(`[Scheduler] Started — interval: ${hours}h (${frequencyMs}ms)`);
+}
+
+/**
+ * Called on server boot (from instrumentation.ts).
+ * Reads scrapeFrequency from the Settings table; starts scheduler only if set.
+ */
+export async function initScheduler(): Promise<void> {
+  try {
+    const settings = await prisma.settings.findUnique({ where: { id: 1 } });
+    const freq = settings?.scrapeFrequency;
+    if (freq && FREQUENCY_MS[freq]) {
+      startScheduler(FREQUENCY_MS[freq]);
+      console.log(`[Scheduler] Auto-started with frequency: ${freq}`);
+    } else {
+      console.log("[Scheduler] No frequency configured — manual scraping only");
+    }
+  } catch (e) {
+    console.error("[Scheduler] Failed to read Settings on init:", e instanceof Error ? e.message : e);
+  }
 }

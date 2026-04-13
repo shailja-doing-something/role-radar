@@ -75,3 +75,20 @@ model Top100Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Singleton row (id always = 1) — stores global app configuration
+model Settings {
+  id               Int      @id @default(1)
+  scrapeFrequency  String?  // "6h" | "12h" | "daily" | "weekly" | null = manual only
+  emailDigest      Boolean  @default(false)
+  emailRecipients  String?  // comma-separated emails
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Stores the full Gemini hiring-intelligence analysis result after each scrape
+model Analysis {
+  id        Int      @id @default(autoincrement())
+  data      Json
+  createdAt DateTime @default(now())
+}
