@@ -99,7 +99,7 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
   url.searchParams.set("query",       `${role} real estate team USA`);
   url.searchParams.set("page",        "1");
   url.searchParams.set("num_pages",   "1");
-  url.searchParams.set("date_posted", "today");
+  url.searchParams.set("date_posted", "3days");
   url.searchParams.set("country",     "us");
 
   const doFetch = () =>
@@ -290,6 +290,14 @@ export async function scrapeAll(): Promise<void> {
 
   if (raw.length === 0) {
     console.log("[Scraper] scrapeAll: 0 raw results — verify JSEARCH_API_KEY and rate limits");
+    // Stamp all active boards so lastScraped reflects this cycle ran
+    const boards = await prisma.jobBoard.findMany({ where: { active: true } });
+    for (const b of boards) {
+      await prisma.jobBoard.update({
+        where: { slug: b.slug },
+        data: { lastScraped: new Date(), lastScrapedCount: 0 },
+      });
+    }
     return;
   }
 
