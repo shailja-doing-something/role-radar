@@ -186,14 +186,26 @@ const TOP_100_TEAMS: { name: string; brokerage: string; location: string; websit
 ];
 
 async function main() {
+  // Upsert boards — never delete postings, patterns, or analysis.
+  // FK constraint (JobPosting.source → JobBoard.slug) is safe as long as
+  // we keep all existing slugs, which upsert guarantees.
   console.log("Seeding job boards...");
-  // Delete postings first (FK constraint: JobPosting.source → JobBoard.slug)
-  await prisma.jobPosting.deleteMany({});
-  await prisma.pattern.deleteMany({});
-  await prisma.jobBoard.deleteMany({});
-  await prisma.jobBoard.createMany({ data: JOB_BOARDS });
+  for (const board of JOB_BOARDS) {
+    await prisma.jobBoard.upsert({
+      where:  { slug: board.slug },
+      create: board,
+      // Only refresh static metadata — never overwrite runtime state
+      update: {
+        name:        board.name,
+        baseUrl:     board.baseUrl,
+        category:    board.category,
+        description: board.description,
+      },
+    });
+  }
   console.log(`Seeded ${JOB_BOARDS.length} job boards.`);
 
+  // Top100Teams have no FK dependents — safe to replace
   console.log("Seeding Top 100 Teams...");
   await prisma.top100Team.deleteMany({});
   await prisma.top100Team.createMany({ data: TOP_100_TEAMS });
