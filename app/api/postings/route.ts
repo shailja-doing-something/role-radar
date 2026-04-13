@@ -4,16 +4,20 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const source = searchParams.get("source");
   const q = searchParams.get("q");
+  const remoteParam = searchParams.get("remote");
   const page = parseInt(searchParams.get("page") ?? "1");
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 100);
 
   const where = {
     ...(source ? { source } : {}),
+    ...(remoteParam !== null && remoteParam !== ""
+      ? { remote: remoteParam === "true" }
+      : {}),
     ...(q
       ? {
           OR: [
-            { title: { contains: q } },
-            { company: { contains: q } },
+            { title: { contains: q, mode: "insensitive" as const } },
+            { company: { contains: q, mode: "insensitive" as const } },
           ],
         }
       : {}),

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Trophy } from "lucide-react";
+import Link from "next/link";
 
 export default async function Top100Page() {
   const companies = await prisma.jobPosting.groupBy({
@@ -63,7 +64,12 @@ export default async function Top100Page() {
                     )}
                   </td>
                   <td className="px-6 py-3">
-                    <span className="text-gray-200 font-medium">{c.company}</span>
+                    <Link
+                      href={`/company/${encodeURIComponent(c.company)}`}
+                      className="text-gray-200 font-medium hover:text-blue-400 transition-colors"
+                    >
+                      {c.company}
+                    </Link>
                   </td>
                   <td className="px-6 py-3 text-right">
                     <span className="text-blue-400 font-semibold">

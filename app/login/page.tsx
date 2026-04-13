@@ -41,8 +41,12 @@ export default function LoginPage() {
           </span>
         </div>
 
+        <p className="text-center text-gray-500 text-sm mb-6">
+          Job market intelligence, automated.
+        </p>
+
         <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800">
-          <h1 className="text-white text-lg font-semibold mb-6">Sign in</h1>
+          <h1 className="text-white text-lg font-semibold mb-6">Sign in to your workspace</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -54,7 +58,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3.5 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="admin@roleradar.local"
+                placeholder="you@example.com"
                 required
                 autoComplete="email"
               />

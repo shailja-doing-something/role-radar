@@ -12,6 +12,8 @@ interface ScrapedPosting {
   postedAt?: string;
 }
 
+// ── Hacker News Jobs ────────────────────────────────────────────────────────
+
 async function scrapeHN(): Promise<ScrapedPosting[]> {
   const res = await fetch(
     "https://hacker-news.firebaseio.com/v0/jobstories.json",
@@ -19,7 +21,7 @@ async function scrapeHN(): Promise<ScrapedPosting[]> {
   );
   const ids: number[] = await res.json();
 
-  const postings = await Promise.allSettled(
+  const results = await Promise.allSettled(
     ids.slice(0, 30).map(async (id) => {
       const r = await fetch(
         `https://hacker-news.firebaseio.com/v0/item/${id}.json`
@@ -38,10 +40,12 @@ async function scrapeHN(): Promise<ScrapedPosting[]> {
     })
   );
 
-  return postings
+  return results
     .filter((r) => r.status === "fulfilled" && r.value !== null)
     .map((r) => (r as PromiseFulfilledResult<ScrapedPosting>).value);
 }
+
+// ── RemoteOK ─────────────────────────────────────────────────────────────────
 
 async function scrapeRemoteOK(): Promise<ScrapedPosting[]> {
   const res = await fetch("https://remoteok.com/api", {
@@ -62,6 +66,59 @@ async function scrapeRemoteOK(): Promise<ScrapedPosting[]> {
     postedAt: job.date ? new Date(job.date).toISOString() : undefined,
   }));
 }
+
+// ── Remotive ─────────────────────────────────────────────────────────────────
+
+async function scrapeRemotive(): Promise<ScrapedPosting[]> {
+  const res = await fetch("https://remotive.com/api/remote-jobs?limit=100", {
+    headers: { "User-Agent": "RoleRadar/1.0" },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { jobs: Record<string, string>[] };
+
+  return data.jobs.map((job) => ({
+    title: job.title ?? "Untitled",
+    company: job.company_name ?? "Unknown",
+    location: job.candidate_required_location || "Remote",
+    remote: true,
+    url: job.url,
+    description: job.description
+      ? job.description.replace(/<[^>]*>/g, " ").slice(0, 2000)
+      : undefined,
+    salary: job.salary || undefined,
+    postedAt: job.publication_date
+      ? new Date(job.publication_date).toISOString()
+      : undefined,
+  }));
+}
+
+// ── Arbeitnow ────────────────────────────────────────────────────────────────
+
+async function scrapeArbeitnow(): Promise<ScrapedPosting[]> {
+  const res = await fetch("https://www.arbeitnow.com/api/job-board-api", {
+    headers: { "User-Agent": "RoleRadar/1.0" },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { data: Record<string, unknown>[] };
+
+  return data.data.slice(0, 100).map((job) => ({
+    title: String(job.title ?? "Untitled"),
+    company: String(job.company_name ?? "Unknown"),
+    location: String(job.location ?? ""),
+    remote: Boolean(job.remote),
+    url: String(job.url),
+    description: job.description
+      ? String(job.description).replace(/<[^>]*>/g, " ").slice(0, 2000)
+      : undefined,
+    postedAt: job.created_at
+      ? new Date(Number(job.created_at) * 1000).toISOString()
+      : undefined,
+  }));
+}
+
+// ── Generic Gemini-powered extractor ─────────────────────────────────────────
 
 async function scrapeGeneric(
   board: { baseUrl: string }
@@ -95,6 +152,8 @@ ${html.slice(0, 8000)}
   }
 }
 
+// ── Main dispatch ─────────────────────────────────────────────────────────────
+
 export async function scrapeBoard(boardSlug: string): Promise<number> {
   const board = await prisma.jobBoard.findUnique({ where: { slug: boardSlug } });
   if (!board || !board.active) return 0;
@@ -106,11 +165,20 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
       postings = await scrapeHN();
     } else if (board.slug === "remoteok") {
       postings = await scrapeRemoteOK();
+    } else if (board.slug === "remotive") {
+      postings = await scrapeRemotive();
+    } else if (board.slug === "arbeitnow") {
+      postings = await scrapeArbeitnow();
     } else {
       postings = await scrapeGeneric(board);
     }
   } catch (error) {
-    console.error(`[Scraper] Failed to scrape ${board.name}:`, error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[Scraper] Failed to scrape ${board.name}:`, msg);
+    await prisma.jobBoard.update({
+      where: { slug: boardSlug },
+      data: { lastScraped: new Date(), lastScrapedCount: 0, lastError: msg },
+    });
     return 0;
   }
 
@@ -131,10 +199,7 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
           salary: posting.salary ?? null,
           postedAt: posting.postedAt ? new Date(posting.postedAt) : null,
         },
-        update: {
-          title: posting.title,
-          company: posting.company,
-        },
+        update: { title: posting.title, company: posting.company },
       });
       saved++;
     } catch {
@@ -144,7 +209,11 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
 
   await prisma.jobBoard.update({
     where: { slug: boardSlug },
-    data: { lastScraped: new Date() },
+    data: {
+      lastScraped: new Date(),
+      lastScrapedCount: saved,
+      lastError: null, // clear any previous error on success
+    },
   });
 
   console.log(`[Scraper] ${board.name}: saved ${saved}/${postings.length} postings`);
