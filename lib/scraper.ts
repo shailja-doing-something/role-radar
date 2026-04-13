@@ -151,14 +151,14 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
   const publishers = [...new Set(parsed.data.map(j => j.job_publisher))];
   console.log(`[Scraper] JSearch "${role}": ${rawCount} raw jobs, publishers: ${publishers.join(", ")}`);
 
+  // US_STATES used only for location string assembly — not for filtering.
+  // JSearch's country:"us" param targets US job boards; we trust it for country-level
+  // filtering. Strict job_country checks dropped 90%+ of valid results in testing.
   const postings: ScrapedPosting[] = [];
 
   for (const job of parsed.data) {
-    // US filter: skip if country is explicitly non-US, or state is non-US
-    if (job.job_country && job.job_country !== "US") continue;
-    if (job.job_state && !US_STATES.has(job.job_state))  continue;
-
-    const location = [job.job_city, job.job_state].filter(Boolean).join(", ") || undefined;
+    const location = [job.job_city, job.job_state && US_STATES.has(job.job_state) ? job.job_state : null]
+      .filter(Boolean).join(", ") || undefined;
 
     postings.push({
       title:    job.job_title,
@@ -171,11 +171,6 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
       postedAt: job.job_posted_at_datetime_utc ?? undefined,
       source:   publisherToSlug(job.job_publisher),
     });
-  }
-
-  const filtered = rawCount - postings.length;
-  if (filtered > 0) {
-    console.log(`[Scraper] JSearch "${role}": ${filtered} dropped by US filter, ${postings.length} kept`);
   }
 
   return postings;
@@ -192,7 +187,7 @@ async function collectAllFromJSearch(): Promise<ScrapedPosting[]> {
   const all: ScrapedPosting[] = [];
 
   for (const role of FIXED_ROLES) {
-    console.log(`[Scraper] JSearch querying: "${role} real estate team USA"`);
+    console.log(`[Scraper] JSearch querying: "${role} real estate"`);
     const results = await fetchFromJSearch(role);
     console.log(`[Scraper] JSearch "${role}": ${results.length} US results`);
     all.push(...results);
@@ -290,8 +285,25 @@ async function upsertPostings(
 
 // ── scrapeAll ─────────────────────────────────────────────────────────────────
 // Collects from JSearch for all roles, filters with Gemini, upserts per board.
+// Module-level lock prevents concurrent runs from racing on JSearch rate limits.
+
+let scraperRunning = false;
 
 export async function scrapeAll(): Promise<void> {
+  if (scraperRunning) {
+    console.log("[Scraper] scrapeAll already in progress — skipping concurrent call");
+    return;
+  }
+  scraperRunning = true;
+
+  try {
+    await _scrapeAll();
+  } finally {
+    scraperRunning = false;
+  }
+}
+
+async function _scrapeAll(): Promise<void> {
   console.log(`[Scraper] scrapeAll starting — ${FIXED_ROLES.length} roles × JSearch`);
 
   // 1. Collect
