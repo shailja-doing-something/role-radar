@@ -1,18 +1,8 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { Nav } from "@/components/nav";
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const session = await auth();
+export const dynamic = "force-dynamic";
 
-  if (!session) {
-    redirect("/login");
-  }
-
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-950">
       <Nav />
