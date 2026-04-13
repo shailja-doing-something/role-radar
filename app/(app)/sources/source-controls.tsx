@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw, Power } from "lucide-react";
+import { RefreshCw, Power, PowerOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Props {
@@ -45,26 +45,37 @@ export function SourceControls({ id, slug, active }: Props) {
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <button
-        onClick={handleScrape}
-        disabled={scraping || !active}
-        title="Scrape now"
-        className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 disabled:opacity-30 transition-colors"
-      >
-        <RefreshCw size={15} className={scraping ? "animate-spin" : ""} />
-      </button>
-      <button
-        onClick={handleToggle}
-        disabled={toggling}
-        title={active ? "Deactivate" : "Activate"}
-        className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 ${
-          active
-            ? "text-green-400 hover:text-white hover:bg-gray-800"
-            : "text-gray-600 hover:text-white hover:bg-gray-800"
-        }`}
-      >
-        <Power size={15} />
-      </button>
+      {active ? (
+        <>
+          <button
+            onClick={handleScrape}
+            disabled={scraping}
+            title="Scrape now"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 transition-colors"
+          >
+            <RefreshCw size={13} className={scraping ? "animate-spin" : ""} />
+            {scraping ? "Scraping…" : "Scrape"}
+          </button>
+          <button
+            onClick={handleToggle}
+            disabled={toggling}
+            title="Disable source"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-gray-800 disabled:opacity-30 transition-colors"
+          >
+            <PowerOff size={13} />
+            Disable
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={handleToggle}
+          disabled={toggling}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-30 transition-colors border border-blue-800 hover:border-blue-600"
+        >
+          <Power size={13} />
+          {toggling ? "Enabling…" : "Enable"}
+        </button>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Database, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { SourceControls } from "./source-controls";
+import { AddSourceForm } from "./add-source-form";
 
 export default async function SourcesPage() {
   const boards = await prisma.jobBoard.findMany({
@@ -10,10 +11,13 @@ export default async function SourcesPage() {
 
   return (
     <div className="p-8">
-      <h1 className="flex items-center gap-2 text-2xl font-bold text-white mb-6">
-        <Database size={22} className="text-blue-400" />
-        Sources
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+          <Database size={22} className="text-blue-400" />
+          Sources
+        </h1>
+        <AddSourceForm />
+      </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
