@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateJSON } from "@/lib/gemini";
+import { generateJSON, generateJSONWithSearch } from "@/lib/gemini";
 
 interface ScrapedPosting {
   title: string;
@@ -118,38 +118,88 @@ async function scrapeArbeitnow(): Promise<ScrapedPosting[]> {
   }));
 }
 
-// ── Generic Gemini-powered extractor ─────────────────────────────────────────
+// ── Real-estate role taxonomy ─────────────────────────────────────────────────
+// These are the roles searched on every active board during each scrape cycle.
 
-async function scrapeGeneric(
-  board: { baseUrl: string }
+const FIXED_ROLES = [
+  "Real Estate Agent",
+  "Buyer Agent",
+  "Transaction Coordinator",
+  "Inside Sales Agent",
+  "Real Estate Operations Manager",
+  "Listing Coordinator",
+  "Real Estate Marketing Manager",
+  "Showing Agent",
+];
+
+// ── Gemini web-search powered extractor ──────────────────────────────────────
+// Replaces the old HTML-fetch approach. For each board × role combination,
+// Gemini searches the web (Google Search grounding) for current job postings
+// and returns structured data. This works for JS-rendered boards like LinkedIn
+// and Indeed where raw HTML contains no job listings.
+
+async function scrapeWithSearch(
+  board: { name: string; slug: string; baseUrl: string }
 ): Promise<ScrapedPosting[]> {
-  const res = await fetch(board.baseUrl, {
-    headers: { "User-Agent": "RoleRadar/1.0" },
-  });
-  if (!res.ok) return [];
-  const html = await res.text();
+  const allPostings: ScrapedPosting[] = [];
+  const seenUrls = new Set<string>();
+  let isFirstCombo = true;
 
-  try {
-    return await generateJSON<ScrapedPosting[]>(`
-Extract job postings from this HTML page. Return an array of job objects.
+  console.log(
+    `[Scraper] Starting board "${board.name}" — will search ${FIXED_ROLES.length} roles: ${FIXED_ROLES.join(", ")}`
+  );
 
-Each object must have:
-- title (string, required)
-- company (string, required)
-- url (string, required — absolute URL to the job posting)
-- location (string, optional)
-- remote (boolean, optional)
-- description (string, optional — brief summary)
-- salary (string, optional)
+  for (const role of FIXED_ROLES) {
+    console.log(`[Scraper] Board "${board.name}" × role "${role}": searching...`);
 
-Only return real job postings found in the HTML. Return an empty array [] if none found.
+    const prompt = `Use Google Search to find current "${role}" job postings on ${board.name} (${board.baseUrl}).
 
-HTML (first 8000 chars):
-${html.slice(0, 8000)}
-`);
-  } catch {
-    return [];
+Search for active listings posted within the last 90 days on that specific job board.
+For each job posting you find, extract:
+- title: exact job title (string, required)
+- company: company or real estate team name (string, required)
+- url: direct absolute link to that job posting — must start with http (string, required)
+- location: city and state, or "Remote" (string)
+- remote: true if remote, false otherwise (boolean)
+- salary: salary or range if shown (string, optional)
+- description: 1–2 sentence summary of the role (string, optional)
+
+Return only a raw JSON array of job posting objects. No markdown, no code fences, no explanation.
+Return [] if no real estate job postings are found on ${board.name}.`;
+
+    try {
+      const postings = await generateJSONWithSearch<ScrapedPosting>(
+        prompt,
+        isFirstCombo ? `${board.name} × "${role}"` : undefined
+      );
+      isFirstCombo = false;
+
+      let addedThisRole = 0;
+      for (const p of postings) {
+        if (p?.url && !seenUrls.has(p.url)) {
+          seenUrls.add(p.url);
+          allPostings.push(p as ScrapedPosting);
+          addedThisRole++;
+        }
+      }
+
+      console.log(
+        `[Scraper] Board "${board.name}" × role "${role}": ${postings.length} returned by Gemini, ${addedThisRole} new after cross-role dedup`
+      );
+    } catch (e) {
+      console.error(
+        `[Scraper] Board "${board.name}" × role "${role}" FAILED: ${e instanceof Error ? e.message : e}`
+      );
+    }
+
+    // Pause between Gemini calls to stay within rate limits
+    await new Promise((r) => setTimeout(r, 2000));
   }
+
+  console.log(
+    `[Scraper] Board "${board.name}" done — ${allPostings.length} unique postings across all ${FIXED_ROLES.length} roles`
+  );
+  return allPostings;
 }
 
 // ── Shared fetch + upsert logic ───────────────────────────────────────────────
@@ -165,12 +215,14 @@ function healthCheckBackoffMs(consecutiveFailures: number): number {
   return Math.min(hours, 168) * 60 * 60 * 1000;
 }
 
-async function fetchPostings(board: { slug: string; baseUrl: string }): Promise<ScrapedPosting[]> {
+async function fetchPostings(board: { slug: string; name: string; baseUrl: string }): Promise<ScrapedPosting[]> {
+  // Legacy API-based scrapers kept for if those slugs are ever re-added
   if (board.slug === "hn")        return scrapeHN();
   if (board.slug === "remoteok")  return scrapeRemoteOK();
   if (board.slug === "remotive")  return scrapeRemotive();
   if (board.slug === "arbeitnow") return scrapeArbeitnow();
-  return scrapeGeneric(board);
+  // All real-estate boards use Gemini web search × FIXED_ROLES
+  return scrapeWithSearch(board);
 }
 
 async function upsertPostings(
@@ -178,8 +230,14 @@ async function upsertPostings(
   sourceSlug: string
 ): Promise<number> {
   let saved = 0;
+  let skippedIncomplete = 0;
+  let skippedDuplicate = 0;
+
   for (const posting of postings) {
-    if (!posting.url || !posting.title || !posting.company) continue;
+    if (!posting.url || !posting.title || !posting.company) {
+      skippedIncomplete++;
+      continue;
+    }
     try {
       await prisma.jobPosting.upsert({
         where: { url: posting.url },
@@ -198,9 +256,13 @@ async function upsertPostings(
       });
       saved++;
     } catch {
-      // skip duplicates or constraint violations
+      skippedDuplicate++;
     }
   }
+
+  console.log(
+    `[Scraper] upsert [${sourceSlug}]: ${postings.length} attempted → ${saved} saved, ${skippedIncomplete} incomplete, ${skippedDuplicate} constraint errors`
+  );
   return saved;
 }
 
