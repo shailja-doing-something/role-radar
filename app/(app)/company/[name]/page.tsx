@@ -27,10 +27,10 @@ export default async function CompanyPage({
   return (
     <div className="p-8">
       <Link
-        href="/top100"
+        href="/postings"
         className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-6 transition-colors w-fit"
       >
-        <ArrowLeft size={14} /> Back to Top 100
+        <ArrowLeft size={14} /> Back to Postings
       </Link>
 
       <div className="mb-8">

@@ -86,7 +86,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {/* Top Companies */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-4">Top Hiring Companies</h2>
+          <h2 className="text-white font-semibold mb-4">Top Companies (scraped postings)</h2>
           {topCompanies.length === 0 ? (
             <p className="text-gray-500 text-sm">No data yet — scrape from Sources.</p>
           ) : (
