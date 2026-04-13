@@ -154,7 +154,16 @@ ${html.slice(0, 8000)}
 
 // ── Shared fetch + upsert logic ───────────────────────────────────────────────
 
-const AUTO_DISABLE_THRESHOLD = 5; // consecutive zero-result / error scrapes
+// Auto-disable after this many consecutive scrapes where the API returned nothing.
+// Duplicate-only runs (source works but all jobs already saved) do NOT count as failures.
+const AUTO_DISABLE_THRESHOLD = 5;
+
+// Health-check backoff: 6h base, doubles per extra failure beyond threshold, caps at 1 week.
+function healthCheckBackoffMs(consecutiveFailures: number): number {
+  const extra = Math.max(0, consecutiveFailures - AUTO_DISABLE_THRESHOLD);
+  const hours = 6 * Math.pow(2, extra);
+  return Math.min(hours, 168) * 60 * 60 * 1000;
+}
 
 async function fetchPostings(board: { slug: string; baseUrl: string }): Promise<ScrapedPosting[]> {
   if (board.slug === "hn")        return scrapeHN();
@@ -229,10 +238,8 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
     return 0;
   }
 
-  const saved = await upsertPostings(postings, board.slug);
-
-  if (saved === 0) {
-    // Zero results — count as a failure for auto-disable purposes
+  // Source returned nothing — real failure, increment counter
+  if (postings.length === 0) {
     const failures = board.consecutiveFailures + 1;
     const shouldDisable = failures >= AUTO_DISABLE_THRESHOLD;
 
@@ -248,40 +255,60 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
     });
 
     if (shouldDisable) {
-      console.warn(`[Scraper] Auto-disabled ${board.name} after ${failures} consecutive zero-result scrapes.`);
+      console.warn(`[Scraper] Auto-disabled ${board.name} after ${failures} consecutive empty responses.`);
     }
-  } else {
-    // Success — reset failure counter, clear error
-    await prisma.jobBoard.update({
-      where: { slug: boardSlug },
-      data: {
-        lastScraped: new Date(),
-        lastScrapedCount: saved,
-        lastError: null,
-        consecutiveFailures: 0,
-      },
-    });
+    return 0;
   }
+
+  // Source is reachable and returned jobs — success regardless of how many are new
+  const saved = await upsertPostings(postings, board.slug);
+
+  await prisma.jobBoard.update({
+    where: { slug: boardSlug },
+    data: {
+      lastScraped: new Date(),
+      lastScrapedCount: saved,
+      lastError: null,
+      consecutiveFailures: 0,
+    },
+  });
 
   console.log(`[Scraper] ${board.name}: saved ${saved}/${postings.length} postings`);
   return saved;
 }
 
 // ── Health-check for disabled sources ────────────────────────────────────────
-// Tries to fetch from a disabled source. If it returns results, re-enables it.
+// Runs after each scrape cycle. Uses exponential backoff so long-dead sources
+// are checked less frequently over time (6h → 12h → 24h … up to 1 week).
 
 export async function healthCheckDisabled(): Promise<void> {
   const disabled = await prisma.jobBoard.findMany({ where: { active: false } });
+  const now = Date.now();
 
   for (const board of disabled) {
+    // Skip if we checked too recently (backoff based on failure depth)
+    if (board.lastScraped) {
+      const backoff = healthCheckBackoffMs(board.consecutiveFailures);
+      if (now - board.lastScraped.getTime() < backoff) continue;
+    }
+
     try {
       const postings = await fetchPostings(board);
-      if (postings.length === 0) continue;
 
+      if (postings.length === 0) {
+        // Still returning nothing — record the check, deepen backoff
+        await prisma.jobBoard.update({
+          where: { slug: board.slug },
+          data: {
+            lastScraped: new Date(),
+            consecutiveFailures: board.consecutiveFailures + 1,
+          },
+        });
+        continue;
+      }
+
+      // Source is producing results — re-enable it
       const saved = await upsertPostings(postings, board.slug);
-      if (saved === 0) continue; // all duplicates, no new data
-
-      // Re-enable: it's producing results again
       await prisma.jobBoard.update({
         where: { slug: board.slug },
         data: {
@@ -292,9 +319,16 @@ export async function healthCheckDisabled(): Promise<void> {
           consecutiveFailures: 0,
         },
       });
-      console.log(`[Scraper] Auto-re-enabled ${board.name} (returned ${saved} new postings).`);
+      console.log(`[Scraper] Auto-re-enabled ${board.name} (${postings.length} jobs fetched, ${saved} new).`);
     } catch {
-      // Still broken — leave disabled, don't update anything
+      // Still broken — deepen backoff
+      await prisma.jobBoard.update({
+        where: { slug: board.slug },
+        data: {
+          lastScraped: new Date(),
+          consecutiveFailures: board.consecutiveFailures + 1,
+        },
+      });
     }
   }
 }
