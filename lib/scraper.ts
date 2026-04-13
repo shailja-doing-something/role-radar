@@ -152,36 +152,22 @@ ${html.slice(0, 8000)}
   }
 }
 
-// ── Main dispatch ─────────────────────────────────────────────────────────────
+// ── Shared fetch + upsert logic ───────────────────────────────────────────────
 
-export async function scrapeBoard(boardSlug: string): Promise<number> {
-  const board = await prisma.jobBoard.findUnique({ where: { slug: boardSlug } });
-  if (!board || !board.active) return 0;
+const AUTO_DISABLE_THRESHOLD = 5; // consecutive zero-result / error scrapes
 
-  let postings: ScrapedPosting[] = [];
+async function fetchPostings(board: { slug: string; baseUrl: string }): Promise<ScrapedPosting[]> {
+  if (board.slug === "hn")        return scrapeHN();
+  if (board.slug === "remoteok")  return scrapeRemoteOK();
+  if (board.slug === "remotive")  return scrapeRemotive();
+  if (board.slug === "arbeitnow") return scrapeArbeitnow();
+  return scrapeGeneric(board);
+}
 
-  try {
-    if (board.slug === "hn") {
-      postings = await scrapeHN();
-    } else if (board.slug === "remoteok") {
-      postings = await scrapeRemoteOK();
-    } else if (board.slug === "remotive") {
-      postings = await scrapeRemotive();
-    } else if (board.slug === "arbeitnow") {
-      postings = await scrapeArbeitnow();
-    } else {
-      postings = await scrapeGeneric(board);
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`[Scraper] Failed to scrape ${board.name}:`, msg);
-    await prisma.jobBoard.update({
-      where: { slug: boardSlug },
-      data: { lastScraped: new Date(), lastScrapedCount: 0, lastError: msg },
-    });
-    return 0;
-  }
-
+async function upsertPostings(
+  postings: ScrapedPosting[],
+  sourceSlug: string
+): Promise<number> {
   let saved = 0;
   for (const posting of postings) {
     if (!posting.url || !posting.title || !posting.company) continue;
@@ -194,7 +180,7 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
           location: posting.location ?? null,
           remote: posting.remote ?? false,
           url: posting.url,
-          source: board.slug,
+          source: sourceSlug,
           description: posting.description ?? null,
           salary: posting.salary ?? null,
           postedAt: posting.postedAt ? new Date(posting.postedAt) : null,
@@ -206,18 +192,111 @@ export async function scrapeBoard(boardSlug: string): Promise<number> {
       // skip duplicates or constraint violations
     }
   }
+  return saved;
+}
 
-  await prisma.jobBoard.update({
-    where: { slug: boardSlug },
-    data: {
-      lastScraped: new Date(),
-      lastScrapedCount: saved,
-      lastError: null, // clear any previous error on success
-    },
-  });
+// ── Main dispatch ─────────────────────────────────────────────────────────────
+
+export async function scrapeBoard(boardSlug: string): Promise<number> {
+  const board = await prisma.jobBoard.findUnique({ where: { slug: boardSlug } });
+  if (!board || !board.active) return 0;
+
+  let postings: ScrapedPosting[] = [];
+
+  try {
+    postings = await fetchPostings(board);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[Scraper] Failed to scrape ${board.name}:`, msg);
+
+    const failures = board.consecutiveFailures + 1;
+    const shouldDisable = failures >= AUTO_DISABLE_THRESHOLD;
+
+    await prisma.jobBoard.update({
+      where: { slug: boardSlug },
+      data: {
+        lastScraped: new Date(),
+        lastScrapedCount: 0,
+        lastError: msg,
+        consecutiveFailures: failures,
+        ...(shouldDisable ? { active: false } : {}),
+      },
+    });
+
+    if (shouldDisable) {
+      console.warn(`[Scraper] Auto-disabled ${board.name} after ${failures} consecutive failures.`);
+    }
+    return 0;
+  }
+
+  const saved = await upsertPostings(postings, board.slug);
+
+  if (saved === 0) {
+    // Zero results — count as a failure for auto-disable purposes
+    const failures = board.consecutiveFailures + 1;
+    const shouldDisable = failures >= AUTO_DISABLE_THRESHOLD;
+
+    await prisma.jobBoard.update({
+      where: { slug: boardSlug },
+      data: {
+        lastScraped: new Date(),
+        lastScrapedCount: 0,
+        lastError: null,
+        consecutiveFailures: failures,
+        ...(shouldDisable ? { active: false } : {}),
+      },
+    });
+
+    if (shouldDisable) {
+      console.warn(`[Scraper] Auto-disabled ${board.name} after ${failures} consecutive zero-result scrapes.`);
+    }
+  } else {
+    // Success — reset failure counter, clear error
+    await prisma.jobBoard.update({
+      where: { slug: boardSlug },
+      data: {
+        lastScraped: new Date(),
+        lastScrapedCount: saved,
+        lastError: null,
+        consecutiveFailures: 0,
+      },
+    });
+  }
 
   console.log(`[Scraper] ${board.name}: saved ${saved}/${postings.length} postings`);
   return saved;
+}
+
+// ── Health-check for disabled sources ────────────────────────────────────────
+// Tries to fetch from a disabled source. If it returns results, re-enables it.
+
+export async function healthCheckDisabled(): Promise<void> {
+  const disabled = await prisma.jobBoard.findMany({ where: { active: false } });
+
+  for (const board of disabled) {
+    try {
+      const postings = await fetchPostings(board);
+      if (postings.length === 0) continue;
+
+      const saved = await upsertPostings(postings, board.slug);
+      if (saved === 0) continue; // all duplicates, no new data
+
+      // Re-enable: it's producing results again
+      await prisma.jobBoard.update({
+        where: { slug: board.slug },
+        data: {
+          active: true,
+          lastScraped: new Date(),
+          lastScrapedCount: saved,
+          lastError: null,
+          consecutiveFailures: 0,
+        },
+      });
+      console.log(`[Scraper] Auto-re-enabled ${board.name} (returned ${saved} new postings).`);
+    } catch {
+      // Still broken — leave disabled, don't update anything
+    }
+  }
 }
 
 export async function scrapeAll(): Promise<void> {

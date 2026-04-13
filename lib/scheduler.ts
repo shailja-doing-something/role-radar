@@ -1,4 +1,4 @@
-import { scrapeAll } from "@/lib/scraper";
+import { scrapeAll, healthCheckDisabled } from "@/lib/scraper";
 import { prisma } from "@/lib/prisma";
 import { analyzePatterns } from "@/lib/roles";
 
@@ -37,7 +37,9 @@ async function tick() {
   console.log("[Scheduler] Starting scrape cycle...");
   try {
     await scrapeAll();
-    console.log("[Scheduler] Scrape cycle complete. Running pattern analysis...");
+    console.log("[Scheduler] Scrape cycle complete. Running health checks on disabled sources...");
+    await healthCheckDisabled();
+    console.log("[Scheduler] Health checks done. Running pattern analysis...");
     await runPatternAnalysis();
   } catch (error) {
     console.error("[Scheduler] Scrape cycle failed:", error);
