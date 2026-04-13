@@ -25,6 +25,8 @@ model JobBoard {
   name        String
   slug        String       @unique
   baseUrl     String
+  category    String       @default("general")
+  description String?
   active               Boolean      @default(true)
   lastScraped          DateTime?
   lastScrapedCount     Int?

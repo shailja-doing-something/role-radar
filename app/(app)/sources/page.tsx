@@ -42,15 +42,29 @@ export default async function SourcesPage() {
               return (
                 <tr key={board.id} className="border-b border-gray-800/50 last:border-0">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
+                        className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
                           board.active ? "bg-green-400" : "bg-gray-600"
                         }`}
                       />
                       <div>
-                        <span className="text-gray-200 font-medium">{board.name}</span>
-                        <code className="text-gray-600 text-xs ml-2">{board.slug}</code>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-200 font-medium">{board.name}</span>
+                          <code className="text-gray-600 text-xs">{board.slug}</code>
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                              board.category === "niche"
+                                ? "bg-purple-900/40 text-purple-400"
+                                : "bg-gray-800 text-gray-500"
+                            }`}
+                          >
+                            {board.category}
+                          </span>
+                        </div>
+                        {board.description && (
+                          <p className="text-gray-600 text-xs mt-0.5 max-w-xs">{board.description}</p>
+                        )}
                       </div>
                     </div>
                   </td>

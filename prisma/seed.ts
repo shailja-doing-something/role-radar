@@ -7,17 +7,84 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const JOB_BOARDS: { name: string; slug: string; baseUrl: string; active: boolean }[] = [
-  { name: "Hacker News",  slug: "hn",         baseUrl: "https://hacker-news.firebaseio.com/v0",      active: true  },
-  { name: "RemoteOK",     slug: "remoteok",   baseUrl: "https://remoteok.com/api",                   active: true  },
-  { name: "Remotive",     slug: "remotive",   baseUrl: "https://remotive.com/api/remote-jobs",        active: true  },
-  { name: "Arbeitnow",    slug: "arbeitnow",  baseUrl: "https://www.arbeitnow.com/api/job-board-api", active: true  },
-  { name: "LinkedIn",     slug: "linkedin",   baseUrl: "https://www.linkedin.com/jobs/search",        active: false },
-  { name: "Indeed",       slug: "indeed",     baseUrl: "https://www.indeed.com/jobs",                 active: false },
-  { name: "Greenhouse",   slug: "greenhouse", baseUrl: "https://boards.greenhouse.io",                active: false },
-  { name: "Lever",        slug: "lever",      baseUrl: "https://jobs.lever.co",                       active: false },
-  { name: "We Work Remotely", slug: "wwr",    baseUrl: "https://weworkremotely.com",                  active: false },
-  { name: "AngelList",    slug: "angellist",  baseUrl: "https://angel.co/jobs",                       active: false },
+const JOB_BOARDS: {
+  name: string; slug: string; baseUrl: string;
+  category: string; description: string; active: boolean;
+}[] = [
+  // ── Niche (real estate specific) ─────────────────────────────────────────
+  {
+    name: "SelectLeaders",
+    slug: "selectleaders",
+    baseUrl: "https://www.selectleaders.com",
+    category: "niche",
+    description: "Gold standard for commercial real estate roles. Used by CBRE, JLL, and top CRE firms.",
+    active: true,
+  },
+  {
+    name: "A.CRE Jobs",
+    slug: "acre",
+    baseUrl: "https://www.adventuresincre.com/jobs",
+    category: "niche",
+    description: "Best for finance-heavy roles: acquisitions, asset management, development, REPE.",
+    active: true,
+  },
+  {
+    name: "iHireRealEstate",
+    slug: "ihire",
+    baseUrl: "https://www.ihirerealestate.com",
+    category: "niche",
+    description: "Broad niche board: brokerage, property management, admin, marketing.",
+    active: true,
+  },
+  {
+    name: "CoreNet Global",
+    slug: "corenet",
+    baseUrl: "https://www.corenetglobal.org/careers",
+    category: "niche",
+    description: "Corporate real estate and workplace strategy roles.",
+    active: false,
+  },
+  {
+    name: "CREW Network",
+    slug: "crew",
+    baseUrl: "https://www.crewnetwork.org/careers",
+    category: "niche",
+    description: "Mid/senior CRE roles with strong networking emphasis.",
+    active: false,
+  },
+  // ── General (high volume, real estate teams post here at scale) ───────────
+  {
+    name: "LinkedIn",
+    slug: "linkedin",
+    baseUrl: "https://www.linkedin.com/jobs",
+    category: "general",
+    description: "Best overall for real estate teams, brokerages, and proptech hiring.",
+    active: true,
+  },
+  {
+    name: "Indeed",
+    slug: "indeed",
+    baseUrl: "https://www.indeed.com",
+    category: "general",
+    description: "Massive volume: sales agents, analysts, operations.",
+    active: true,
+  },
+  {
+    name: "ZipRecruiter",
+    slug: "ziprecruiter",
+    baseUrl: "https://www.ziprecruiter.com",
+    category: "general",
+    description: "Good for brokerage and agency hiring pipelines.",
+    active: true,
+  },
+  {
+    name: "Glassdoor",
+    slug: "glassdoor",
+    baseUrl: "https://www.glassdoor.com/Job",
+    category: "general",
+    description: "Useful for team culture signals alongside job listings.",
+    active: false,
+  },
 ];
 
 const TOP_100_TEAMS: { name: string; brokerage: string; location: string; website: string }[] = [
@@ -120,13 +187,11 @@ const TOP_100_TEAMS: { name: string; brokerage: string; location: string; websit
 
 async function main() {
   console.log("Seeding job boards...");
-  for (const board of JOB_BOARDS) {
-    await prisma.jobBoard.upsert({
-      where: { slug: board.slug },
-      create: board,
-      update: { name: board.name, baseUrl: board.baseUrl, active: board.active },
-    });
-  }
+  // Delete postings first (FK constraint: JobPosting.source → JobBoard.slug)
+  await prisma.jobPosting.deleteMany({});
+  await prisma.pattern.deleteMany({});
+  await prisma.jobBoard.deleteMany({});
+  await prisma.jobBoard.createMany({ data: JOB_BOARDS });
   console.log(`Seeded ${JOB_BOARDS.length} job boards.`);
 
   console.log("Seeding Top 100 Teams...");
