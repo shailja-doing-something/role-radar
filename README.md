@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RoleRadar
 
-## Getting Started
+Job market intelligence tool. Scrapes job boards, identifies hiring patterns, and surfaces the top 100 teams actively recruiting.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, Turbopack)
+- **React 19**
+- **Prisma 7** + SQLite (`better-sqlite3` driver adapter)
+- **NextAuth v5** (JWT credentials)
+- **Tailwind CSS v4**
+- **Google Gemini** (pattern analysis, generic board scraping)
+- **lucide-react** (icons)
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+Copy and fill in `.env`:
+
+```bash
+DATABASE_URL="file:./dev.db"
+AUTH_SECRET="<generate with: openssl rand -hex 32>"
+GEMINI_API_KEY="<your Gemini API key>"
+```
+
+### 3. Run migrations and seed
+
+```bash
+npx prisma migrate dev
+npx prisma db seed
+```
+
+This creates the SQLite database and seeds:
+- 8 job boards (HN, RemoteOK, LinkedIn, Indeed, Greenhouse, Lever, WWR, AngelList)
+- Admin user: `admin@roleradar.local` / `password`
+
+### 4. Start the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). You will be redirected to `/login`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Page | Path | Description |
+|------|------|-------------|
+| Dashboard | `/dashboard` | Overview stats, top companies, recent postings |
+| Patterns | `/patterns` | AI-extracted skill/tool frequency trends |
+| Top 100 Teams | `/top100` | Companies ranked by open role count |
+| Sources | `/sources` | Manage job boards, trigger manual scrapes |
+| Settings | `/settings` | Change password |
 
-## Learn More
+## Scraping
 
-To learn more about Next.js, take a look at the following resources:
+- **HN Jobs** and **RemoteOK** use their public APIs and run without a Gemini key.
+- All other boards use a Gemini-powered HTML extractor — set `GEMINI_API_KEY` to enable them.
+- The scheduler auto-scrapes all active boards every **6 hours** via `instrumentation.ts`.
+- Trigger a manual scrape from the Sources page, or call `POST /api/scrape` with `{ "slug": "hn" }`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API Routes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/stats` | Dashboard stats |
+| GET | `/api/postings` | Paginated job postings |
+| GET | `/api/patterns` | Skill patterns |
+| POST | `/api/patterns` | Trigger AI pattern analysis |
+| GET | `/api/top100` | Top 100 companies |
+| GET | `/api/sources` | List job boards |
+| POST | `/api/sources` | Add a job board |
+| PATCH | `/api/sources/[id]` | Update a job board |
+| DELETE | `/api/sources/[id]` | Delete a job board |
+| POST | `/api/scrape` | Trigger scrape (body: `{ slug? }`) |
 
-## Deploy on Vercel
+## Conventions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- TypeScript everywhere, named exports
+- Prisma only — never raw SQL
+- Tailwind only — no inline styles
+- `lucide-react` for all icons
+- All Gemini calls wrapped in try/catch with retry (`lib/gemini.ts`)
+- `JobBoard.slug` is the single source of truth linking `JobPosting.source` to `JobBoard` records
