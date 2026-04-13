@@ -1,4 +1,5 @@
 import { Settings, Clock } from "lucide-react";
+import { ClearDataButton } from "./clear-data-button";
 
 export default function SettingsPage() {
   return (
@@ -31,6 +32,14 @@ export default function SettingsPage() {
               <span className="text-gray-300">Sources page → Scrape Now</span>
             </div>
           </div>
+        </section>
+
+        <section className="bg-gray-900 border border-red-900/50 rounded-xl p-6">
+          <h2 className="text-red-400 font-semibold mb-1">Danger Zone</h2>
+          <p className="text-gray-500 text-sm mb-4">
+            Permanently delete all scraped job postings and skill patterns. Sources are kept intact.
+          </p>
+          <ClearDataButton />
         </section>
       </div>
     </div>
