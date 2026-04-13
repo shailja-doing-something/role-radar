@@ -96,10 +96,10 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
   }
 
   const url = new URL("https://jsearch.p.rapidapi.com/search");
-  url.searchParams.set("query",       `${role} real estate team USA`);
+  url.searchParams.set("query",       `${role} real estate`);
   url.searchParams.set("page",        "1");
-  url.searchParams.set("num_pages",   "1");
-  url.searchParams.set("date_posted", "3days");
+  url.searchParams.set("num_pages",   "3");
+  url.searchParams.set("date_posted", "week");
   url.searchParams.set("country",     "us");
 
   const doFetch = () =>
@@ -147,6 +147,10 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
     return [];
   }
 
+  const rawCount = parsed.data.length;
+  const publishers = [...new Set(parsed.data.map(j => j.job_publisher))];
+  console.log(`[Scraper] JSearch "${role}": ${rawCount} raw jobs, publishers: ${publishers.join(", ")}`);
+
   const postings: ScrapedPosting[] = [];
 
   for (const job of parsed.data) {
@@ -167,6 +171,11 @@ async function fetchFromJSearch(role: string): Promise<ScrapedPosting[]> {
       postedAt: job.job_posted_at_datetime_utc ?? undefined,
       source:   publisherToSlug(job.job_publisher),
     });
+  }
+
+  const filtered = rawCount - postings.length;
+  if (filtered > 0) {
+    console.log(`[Scraper] JSearch "${role}": ${filtered} dropped by US filter, ${postings.length} kept`);
   }
 
   return postings;
