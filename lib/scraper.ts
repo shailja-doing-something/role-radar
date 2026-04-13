@@ -289,6 +289,10 @@ async function upsertPostings(
 
 let scraperRunning = false;
 
+export function isScraperRunning(): boolean {
+  return scraperRunning;
+}
+
 export async function scrapeAll(): Promise<void> {
   if (scraperRunning) {
     console.log("[Scraper] scrapeAll already in progress — skipping concurrent call");
