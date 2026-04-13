@@ -245,9 +245,9 @@ async function upsertPostings(
   postings: ScrapedPosting[],
   sourceSlug: string
 ): Promise<number> {
-  let saved = 0;
+  let created = 0;
+  let refreshed = 0;
   let skippedIncomplete = 0;
-  let skippedDuplicate = 0;
 
   for (const posting of postings) {
     if (!posting.url || !posting.title || !posting.company) {
@@ -255,32 +255,60 @@ async function upsertPostings(
       continue;
     }
     try {
-      await prisma.jobPosting.upsert({
-        where: { url: posting.url },
+      const result = await prisma.jobPosting.upsert({
+        where:  { url: posting.url },
         create: {
-          title:    posting.title,
-          company:  posting.company,
-          location: posting.location  ?? null,
-          remote:   posting.remote    ?? false,
-          url:      posting.url,
-          source:   sourceSlug,
+          title:       posting.title,
+          company:     posting.company,
+          location:    posting.location    ?? null,
+          remote:      posting.remote      ?? false,
+          url:         posting.url,
+          source:      sourceSlug,
           description: posting.description ?? null,
-          salary:   posting.salary    ?? null,
-          postedAt: posting.postedAt  ? new Date(posting.postedAt) : null,
+          salary:      posting.salary      ?? null,
+          postedAt:    posting.postedAt    ? new Date(posting.postedAt) : null,
+          isActive:    true,
+          scrapedAt:   new Date(),
         },
-        update: { title: posting.title, company: posting.company },
+        // Existing record: mark active and refresh scrapedAt — never delete
+        update: {
+          isActive:  true,
+          scrapedAt: new Date(),
+        },
+        select: { createdAt: true, updatedAt: true },
       });
-      saved++;
-    } catch {
-      skippedDuplicate++;
+      // createdAt === updatedAt only on the very first insert
+      if (result.createdAt.getTime() === result.updatedAt.getTime()) {
+        created++;
+      } else {
+        refreshed++;
+      }
+    } catch (e) {
+      console.error(`[Scraper] upsert error for ${posting.url}:`, e instanceof Error ? e.message : e);
+      skippedIncomplete++;
     }
   }
 
   console.log(
     `[Scraper] upsert [${sourceSlug}]: ${postings.length} attempted → ` +
-    `${saved} saved, ${skippedIncomplete} incomplete, ${skippedDuplicate} duplicates`
+    `${created} new, ${refreshed} refreshed, ${skippedIncomplete} skipped`
   );
-  return saved;
+  return created + refreshed;
+}
+
+// ── Mark postings inactive after 30 days of absence ──────────────────────────
+// Runs at the end of every full scrape cycle. Any posting whose scrapedAt is
+// older than 30 days was not seen in recent scrapes and is considered stale.
+
+async function markOldPostingsInactive(): Promise<void> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const result = await prisma.jobPosting.updateMany({
+    where: { scrapedAt: { lt: thirtyDaysAgo }, isActive: true },
+    data:  { isActive: false },
+  });
+  if (result.count > 0) {
+    console.log(`[Scraper] Marked ${result.count} postings inactive (not seen in 30+ days)`);
+  }
 }
 
 // ── scrapeAll ─────────────────────────────────────────────────────────────────
@@ -383,6 +411,9 @@ async function _scrapeAll(): Promise<void> {
 
     console.log(`[Scraper] ${board.name}: ${postings.length} found → ${saved} saved`);
   }
+
+  // Retire any posting not seen in 30+ days
+  await markOldPostingsInactive();
 
   console.log("[Scraper] scrapeAll complete");
 }
