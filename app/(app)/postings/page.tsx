@@ -1,68 +1,77 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, MapPin, DollarSign, ExternalLink, Wifi, Filter, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import {
+  Search, MapPin, DollarSign, ExternalLink,
+  Wifi, Filter, X, Target,
+} from "lucide-react";
 
 interface Posting {
-  id: number;
-  title: string;
-  company: string;
-  location: string | null;
-  remote: boolean;
-  salary: string | null;
-  source: string;
-  url: string;
-  postedAt: string | null;
+  id:        number;
+  title:     string;
+  company:   string;
+  location:  string | null;
+  remote:    boolean;
+  salary:    string | null;
+  source:    string;
+  url:       string;
+  postedAt:  string | null;
   createdAt: string;
+  isTop100:  boolean;
 }
 
-interface Response {
+interface ApiResponse {
   postings: Posting[];
-  total: number;
-  page: number;
-  limit: number;
+  total:    number;
+  page:     number;
+  limit:    number;
 }
 
 const LIMIT = 50;
 
 export default function PostingsPage() {
-  const [data, setData]       = useState<Response | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [q, setQ]             = useState("");
-  const [source, setSource]   = useState("");
-  const [remote, setRemote]   = useState("");
-  const [page, setPage]       = useState(1);
-  const [sources, setSources] = useState<string[]>([]);
+  const searchParams = useSearchParams();
+
+  const [data,       setData]       = useState<ApiResponse | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  // Initialise from URL params so Top100 "View roles" links land pre-filtered
+  const [q,          setQ]          = useState(searchParams.get("company") ?? "");
+  const [source,     setSource]     = useState("");
+  const [remote,     setRemote]     = useState("");
+  const [top100Only, setTop100Only] = useState(searchParams.get("top100Only") === "true");
+  const [page,       setPage]       = useState(1);
+  const [sources,    setSources]    = useState<string[]>([]);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({
-      page: String(page),
+      page:  String(page),
       limit: String(LIMIT),
-      ...(q      ? { q }      : {}),
-      ...(source ? { source } : {}),
-      ...(remote ? { remote } : {}),
+      ...(q          ? { q }                       : {}),
+      ...(source     ? { source }                  : {}),
+      ...(remote     ? { remote }                  : {}),
+      ...(top100Only ? { top100Only: "true" }      : {}),
     });
-    const res = await fetch(`/api/postings?${params}`);
-    const json = await res.json();
+    const res  = await fetch(`/api/postings?${params}`);
+    const json = await res.json() as ApiResponse;
     setData(json);
     setLoading(false);
-  }, [q, source, remote, page]);
+  }, [q, source, remote, top100Only, page]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  // Load source list once
   useEffect(() => {
     fetch("/api/sources")
       .then((r) => r.json())
-      .then((boards) => setSources(boards.map((b: { slug: string }) => b.slug)));
+      .then((boards) => setSources((boards as { slug: string }[]).map((b) => b.slug)));
   }, []);
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 1;
-  const hasFilters = q || source || remote;
+  const hasFilters = q || source || remote || top100Only;
 
   function clearFilters() {
-    setQ(""); setSource(""); setRemote(""); setPage(1);
+    setQ(""); setSource(""); setRemote(""); setTop100Only(false); setPage(1);
   }
 
   return (
@@ -80,6 +89,7 @@ export default function PostingsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
+        {/* Search */}
         <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 flex-1 min-w-48">
           <Search size={15} className="text-gray-500 shrink-0" />
           <input
@@ -90,6 +100,7 @@ export default function PostingsPage() {
           />
         </div>
 
+        {/* Source */}
         <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
           <Filter size={13} className="text-gray-500" />
           <select
@@ -104,6 +115,7 @@ export default function PostingsPage() {
           </select>
         </div>
 
+        {/* Remote */}
         <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
           <Wifi size={13} className="text-gray-500" />
           <select
@@ -112,10 +124,24 @@ export default function PostingsPage() {
             onChange={(e) => { setRemote(e.target.value); setPage(1); }}
           >
             <option value="">All types</option>
-            <option value="true" className="bg-gray-900">Remote only</option>
+            <option value="true"  className="bg-gray-900">Remote only</option>
             <option value="false" className="bg-gray-900">On-site only</option>
           </select>
         </div>
+
+        {/* Target Accounts toggle */}
+        <button
+          type="button"
+          onClick={() => { setTop100Only((v) => !v); setPage(1); }}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+            top100Only
+              ? "bg-amber-950/40 border-amber-700/50 text-amber-400"
+              : "bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-300 hover:border-gray-700"
+          }`}
+        >
+          <Target size={13} />
+          Target Accounts Only
+        </button>
 
         {hasFilters && (
           <button
@@ -161,7 +187,16 @@ export default function PostingsPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-400 truncate max-w-32">{p.company}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 truncate max-w-32">
+                      <span className="text-gray-400 truncate">{p.company}</span>
+                      {p.isTop100 && (
+                        <span title="Top 100 target account">
+                          <Target size={11} className="text-amber-400 shrink-0" />
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     {p.location ? (
                       <span className="flex items-center gap-1 text-gray-400">
@@ -192,8 +227,12 @@ export default function PostingsPage() {
                       : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <a href={p.url} target="_blank" rel="noopener noreferrer"
-                       className="text-gray-600 hover:text-blue-400 transition-colors">
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-blue-400 transition-colors"
+                    >
                       <ExternalLink size={14} />
                     </a>
                   </td>
@@ -207,9 +246,7 @@ export default function PostingsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-gray-500 text-sm">
-            Page {page} of {totalPages}
-          </p>
+          <p className="text-gray-500 text-sm">Page {page} of {totalPages}</p>
           <div className="flex gap-2">
             <button
               disabled={page === 1}

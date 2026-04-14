@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Trash2, Plus, X, MapPin, Building2 } from "lucide-react";
+import { ExternalLink, Trash2, Plus, X, MapPin, Building2, Briefcase } from "lucide-react";
 
 interface Team {
   id: number;
@@ -133,6 +133,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
               <th className="text-left text-gray-500 font-medium px-4 py-3">Brokerage</th>
               <th className="text-left text-gray-500 font-medium px-4 py-3">Location</th>
               <th className="text-left text-gray-500 font-medium px-4 py-3">Website</th>
+              <th className="text-left text-gray-500 font-medium px-4 py-3">Jobs</th>
               <th className="px-6 py-3 w-12" />
             </tr>
           </thead>
@@ -183,6 +184,16 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                   ) : (
                     <span className="text-gray-700 text-xs">—</span>
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <a
+                    href={`/postings?company=${encodeURIComponent(team.name)}&top100Only=true`}
+                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                    title="View open roles"
+                  >
+                    <Briefcase size={11} className="shrink-0" />
+                    View roles
+                  </a>
                 </td>
                 <td className="px-6 py-3">
                   <button

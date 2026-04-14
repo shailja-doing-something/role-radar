@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { LayoutDashboard, ExternalLink, MapPin, DollarSign } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { DashboardCharts } from "./charts";
 import { ScrapeButton } from "./scrape-button";
+import { RecentPostings } from "./recent-postings";
 
 export default async function DashboardPage() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -12,7 +13,6 @@ export default async function DashboardPage() {
     recentByPostedAt,
     activeSources,
     topCompanies,
-    recentPostings,
     remoteCount,
     dailyRaw,
     topPatterns,
@@ -25,15 +25,6 @@ export default async function DashboardPage() {
       _count: { company: true },
       orderBy: { _count: { company: "desc" } },
       take: 8,
-    }),
-    prisma.jobPosting.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true, title: true, company: true, source: true,
-        url: true, location: true, remote: true, salary: true,
-        postedAt: true, createdAt: true,
-      },
     }),
     prisma.jobPosting.count({ where: { remote: true } }),
     prisma.jobPosting.findMany({
@@ -118,52 +109,8 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Recent Postings */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-4">Recent Postings</h2>
-          {recentPostings.length === 0 ? (
-            <p className="text-gray-500 text-sm">No data yet — scrape from Sources.</p>
-          ) : (
-            <div className="space-y-3">
-              {recentPostings.map((p) => (
-                <a
-                  key={p.id}
-                  href={p.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group block"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-gray-300 text-sm truncate group-hover:text-white transition-colors">
-                        {p.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-gray-500 text-xs">{p.company}</span>
-                        {p.remote && (
-                          <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                            Remote
-                          </span>
-                        )}
-                        {p.location && !p.remote && (
-                          <span className="flex items-center gap-0.5 text-gray-500 text-xs">
-                            <MapPin size={10} />{p.location}
-                          </span>
-                        )}
-                        {p.salary && (
-                          <span className="flex items-center gap-0.5 text-green-400 text-xs">
-                            <DollarSign size={10} />{p.salary.slice(0, 20)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <ExternalLink size={13} className="text-gray-600 shrink-0 mt-0.5 group-hover:text-gray-400 transition-colors" />
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Recent Postings — client component with Target Accounts toggle */}
+        <RecentPostings />
       </div>
     </div>
   );

@@ -311,6 +311,27 @@ async function markOldPostingsInactive(): Promise<void> {
   }
 }
 
+// ── Mark Top 100 account postings ────────────────────────────────────────────
+// After upserts, tag any posting whose company name case-insensitively contains
+// a Top 100 team name. Runs once per full scrape cycle (single pass per team).
+
+async function markTop100Postings(): Promise<void> {
+  const teams = await prisma.top100Team.findMany({ select: { name: true } });
+  if (teams.length === 0) return;
+
+  let marked = 0;
+  for (const { name } of teams) {
+    const result = await prisma.jobPosting.updateMany({
+      where: { company: { contains: name, mode: "insensitive" }, isTop100: false },
+      data:  { isTop100: true },
+    });
+    marked += result.count;
+  }
+  if (marked > 0) {
+    console.log(`[Scraper] Flagged ${marked} postings as isTop100=true`);
+  }
+}
+
 // ── scrapeAll ─────────────────────────────────────────────────────────────────
 // Collects from JSearch for all roles, filters with Gemini, upserts per board.
 // Module-level lock prevents concurrent runs from racing on JSearch rate limits.
@@ -414,6 +435,9 @@ async function _scrapeAll(): Promise<void> {
 
   // Retire any posting not seen in 30+ days
   await markOldPostingsInactive();
+
+  // Flag postings from Top 100 target accounts
+  await markTop100Postings();
 
   console.log("[Scraper] scrapeAll complete");
 }

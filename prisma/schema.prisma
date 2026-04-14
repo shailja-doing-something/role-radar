@@ -50,6 +50,7 @@ model JobPosting {
   salary      String?
   postedAt    DateTime?
   isActive    Boolean   @default(true)
+  isTop100    Boolean   @default(false)
   scrapedAt   DateTime  @default(now())
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
