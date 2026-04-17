@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Top100Team" ADD COLUMN "isMatched" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Top100Team" ADD COLUMN "matchedName" TEXT;

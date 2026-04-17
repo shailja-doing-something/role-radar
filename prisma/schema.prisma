@@ -69,13 +69,15 @@ model Pattern {
 }
 
 model Top100Team {
-  id        Int      @id @default(autoincrement())
-  name      String
-  brokerage String?
-  location  String?
-  website   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String
+  brokerage   String?
+  location    String?
+  website     String?
+  isMatched   Boolean  @default(false)
+  matchedName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Singleton row (id always = 1) — stores global app configuration
