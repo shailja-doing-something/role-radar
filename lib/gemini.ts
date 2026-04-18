@@ -1,7 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type Tool } from "@google/generative-ai";
 
 const PRIMARY_MODEL = "gemini-2.5-flash";
 const FALLBACK_MODEL = "gemini-2.5-flash-lite";
+// Gemini 1.5 Flash for Google Search grounding (stable across SDK versions)
+const SEARCH_MODEL = "gemini-1.5-flash-latest";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -51,6 +53,47 @@ export async function generateContent(
   }
 
   throw new Error("All Gemini models failed");
+}
+
+/**
+ * Calls Gemini with Google Search grounding and parses the first JSON array
+ * found in the (potentially noisy) response. Falls back to non-search on error.
+ */
+export async function generateJSONWithSearch<T = unknown>(prompt: string): Promise<T> {
+  const searchTools: Tool[] = [{ googleSearchRetrieval: {} }];
+  const model = genAI.getGenerativeModel({ model: SEARCH_MODEL, tools: searchTools });
+
+  try {
+    const result  = await model.generateContent(prompt);
+    const raw     = result.response.text();
+    const cleaned = extractFirstJsonCollection(raw);
+    return JSON.parse(cleaned) as T;
+  } catch (e) {
+    console.warn("[Gemini] Web-search call failed, falling back to standard:", e instanceof Error ? e.message : e);
+    return generateJSON<T>(prompt);
+  }
+}
+
+/** Extracts the first complete JSON array or object from a (possibly noisy) string. */
+function extractFirstJsonCollection(text: string): string {
+  const openChars  = new Set(["{", "["]);
+  const start      = [...text].findIndex(c => openChars.has(c));
+  if (start === -1) return "[]";
+
+  const open  = text[start];
+  const close = open === "[" ? "]" : "}";
+  let depth = 0, inStr = false, esc = false;
+
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (esc)          { esc = false; continue; }
+    if (c === "\\" && inStr) { esc = true;  continue; }
+    if (c === '"')    { inStr = !inStr; continue; }
+    if (inStr)        continue;
+    if (c === open)   depth++;
+    if (c === close && --depth === 0) return text.slice(start, i + 1);
+  }
+  return "[]";
 }
 
 /**

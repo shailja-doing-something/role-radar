@@ -52,6 +52,23 @@ const JOB_BOARDS: {
     description: "Mid/senior CRE roles with strong networking emphasis.",
     active: false,
   },
+  // ── Direct search (Gemini web search layers) ─────────────────────────────
+  {
+    name: "Team Websites",
+    slug: "website",
+    baseUrl: "",
+    category: "direct",
+    description: "Job postings found directly on team websites via Gemini web search.",
+    active: true,
+  },
+  {
+    name: "Brokerage Portals",
+    slug: "brokerage_portal",
+    baseUrl: "",
+    category: "direct",
+    description: "Job postings from brokerage career portals via Gemini web search.",
+    active: true,
+  },
   // ── General (high volume, real estate teams post here at scale) ───────────
   {
     name: "LinkedIn",
@@ -205,10 +222,21 @@ async function main() {
   }
   console.log(`Seeded ${JOB_BOARDS.length} job boards.`);
 
-  // Top100Teams have no FK dependents — safe to replace
+  // Top100Teams: preserve any existing isaPresence/marketingOpsPresence values
+  // set via the Signals dashboard before wiping and re-seeding.
   console.log("Seeding Top 100 Teams...");
+  const existingTeams = await prisma.top100Team.findMany({
+    select: { name: true, isaPresence: true, marketingOpsPresence: true },
+  });
+  const signalMap = new Map(existingTeams.map(t => [t.name, t]));
   await prisma.top100Team.deleteMany({});
-  await prisma.top100Team.createMany({ data: TOP_100_TEAMS });
+  await prisma.top100Team.createMany({
+    data: TOP_100_TEAMS.map(t => ({
+      ...t,
+      isaPresence:          signalMap.get(t.name)?.isaPresence          ?? "Unknown",
+      marketingOpsPresence: signalMap.get(t.name)?.marketingOpsPresence ?? "Unknown",
+    })),
+  });
   console.log(`Seeded ${TOP_100_TEAMS.length} teams.`);
 }
 
