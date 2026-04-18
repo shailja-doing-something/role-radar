@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Mail } from "lucide-react";
+import { Clock, Mail, Check } from "lucide-react";
 
 interface Props {
-  initialFrequency: string;
-  initialEmailDigest: boolean;
+  initialFrequency:       string;
+  initialEmailDigest:     boolean;
   initialEmailRecipients: string;
 }
 
@@ -16,17 +16,37 @@ const FREQUENCY_LABELS: Record<string, string> = {
   "weekly": "weekly",
 };
 
+function SectionCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon:     React.ElementType;
+  title:    string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-surface border border-edge rounded-xl p-6">
+      <h2 className="flex items-center gap-2 text-white font-semibold text-sm mb-5">
+        <Icon size={14} className="text-indigo-400" />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 export function SettingsForm({
   initialFrequency,
   initialEmailDigest,
   initialEmailRecipients,
 }: Props) {
-  const [frequency,        setFrequency]        = useState(initialFrequency);
-  const [emailDigest,      setEmailDigest]      = useState(initialEmailDigest);
-  const [emailRecipients,  setEmailRecipients]  = useState(initialEmailRecipients);
-  const [saving,           setSaving]           = useState(false);
-  const [saved,            setSaved]            = useState(false);
-  const [error,            setError]            = useState("");
+  const [frequency,       setFrequency]       = useState(initialFrequency);
+  const [emailDigest,     setEmailDigest]     = useState(initialEmailDigest);
+  const [emailRecipients, setEmailRecipients] = useState(initialEmailRecipients);
+  const [saving,          setSaving]          = useState(false);
+  const [saved,           setSaved]           = useState(false);
+  const [error,           setError]           = useState("");
 
   async function handleSave() {
     setSaving(true);
@@ -37,7 +57,7 @@ export function SettingsForm({
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scrapeFrequency: frequency  || null,
+          scrapeFrequency: frequency || null,
           emailDigest,
           emailRecipients: emailRecipients.trim() || null,
         }),
@@ -53,59 +73,44 @@ export function SettingsForm({
   }
 
   return (
-    <div className="space-y-6">
+    <>
       {/* ── Scrape Schedule ──────────────────────────────────────────────────── */}
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h2 className="flex items-center gap-2 text-white font-semibold mb-5">
-          <Clock size={16} className="text-gray-400" />
-          Scrape Schedule
-        </h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-gray-400 text-sm mb-2">Frequency</label>
-            <select
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="">Manual only (no auto-scrape)</option>
-              <option value="6h">Every 6 hours</option>
-              <option value="12h">Every 12 hours</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
-            <p className="text-gray-600 text-xs mt-2">
-              {frequency
-                ? `Scheduler will run automatically ${FREQUENCY_LABELS[frequency] ?? frequency}. Pattern analysis runs after each scrape.`
-                : "No automatic scraping. Use the Run Scrape Now button on the Dashboard to trigger manually."}
-            </p>
-          </div>
+      <SectionCard icon={Clock} title="Scrape Schedule">
+        <div>
+          <label className="block text-fg2 text-xs mb-1.5">Frequency</label>
+          <select
+            value={frequency}
+            onChange={(e) => setFrequency(e.target.value)}
+            className="w-full bg-surface-raised border border-edge text-fg2 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+          >
+            <option value=""       className="bg-surface-raised">Manual only (no auto-scrape)</option>
+            <option value="6h"    className="bg-surface-raised">Every 6 hours</option>
+            <option value="12h"   className="bg-surface-raised">Every 12 hours</option>
+            <option value="daily" className="bg-surface-raised">Daily</option>
+            <option value="weekly" className="bg-surface-raised">Weekly</option>
+          </select>
+          <p className="text-fg3 text-xs mt-2 leading-relaxed">
+            {frequency
+              ? `Scheduler runs automatically ${FREQUENCY_LABELS[frequency] ?? frequency}. Pattern analysis runs after each scrape.`
+              : "No automatic scraping. Trigger manually from the Dashboard."}
+          </p>
         </div>
-      </section>
+      </SectionCard>
 
       {/* ── Email Notifications ──────────────────────────────────────────────── */}
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h2 className="flex items-center gap-2 text-white font-semibold mb-5">
-          <Mail size={16} className="text-gray-400" />
-          Email Notifications
-        </h2>
-
+      <SectionCard icon={Mail} title="Email Notifications">
         <div className="space-y-5">
-          {/* Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-300 text-sm">Email digest</p>
-              <p className="text-gray-600 text-xs mt-0.5">
-                Send a summary after each scrape completes
-              </p>
+              <p className="text-white text-sm">Email digest</p>
+              <p className="text-fg3 text-xs mt-0.5">Send a summary after each scrape completes</p>
             </div>
             <button
               type="button"
               onClick={() => setEmailDigest((v) => !v)}
               aria-pressed={emailDigest}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
-                emailDigest ? "bg-blue-600" : "bg-gray-700"
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                emailDigest ? "bg-indigo-500" : "bg-surface-raised border border-edge"
               }`}
             >
               <span
@@ -116,22 +121,21 @@ export function SettingsForm({
             </button>
           </div>
 
-          {/* Recipients — only shown when digest is on */}
           {emailDigest && (
             <div>
-              <label className="block text-gray-400 text-sm mb-2">Recipients</label>
+              <label className="block text-fg2 text-xs mb-1.5">Recipients</label>
               <input
                 type="text"
                 value={emailRecipients}
                 onChange={(e) => setEmailRecipients(e.target.value)}
                 placeholder="alice@example.com, bob@example.com"
-                className="w-full bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 placeholder-gray-600"
+                className="w-full bg-surface-raised border border-edge text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-fg3"
               />
-              <p className="text-gray-600 text-xs mt-2">Comma-separated email addresses</p>
+              <p className="text-fg3 text-xs mt-1.5">Comma-separated email addresses</p>
             </div>
           )}
         </div>
-      </section>
+      </SectionCard>
 
       {/* ── Save ─────────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
@@ -139,13 +143,17 @@ export function SettingsForm({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+          className="bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
         >
           {saving ? "Saving…" : "Save Settings"}
         </button>
-        {saved  && <span className="text-green-400 text-sm">Saved</span>}
-        {error  && <span className="text-red-400  text-sm">{error}</span>}
+        {saved && (
+          <span className="flex items-center gap-1.5 text-green-400 text-sm">
+            <Check size={14} /> Saved
+          </span>
+        )}
+        {error && <span className="text-red-400 text-sm">{error}</span>}
       </div>
-    </div>
+    </>
   );
 }
