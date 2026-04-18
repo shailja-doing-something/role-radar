@@ -11,6 +11,7 @@ import {
   Database,
   Settings,
   Briefcase,
+  Zap,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const LINKS = [
   { href: "/postings",  label: "Postings",      icon: Briefcase },
   { href: "/patterns",  label: "Patterns",      icon: TrendingUp },
   { href: "/top100",    label: "Top 100 Teams", icon: Trophy },
+  { href: "/signals",   label: "Signals",        icon: Zap },
   { href: "/sources",   label: "Sources",       icon: Database },
   { href: "/settings",  label: "Settings",      icon: Settings },
 ] as const;
