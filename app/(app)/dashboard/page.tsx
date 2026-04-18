@@ -1,22 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import {
   LayoutDashboard, Star, ArrowUp, ArrowDown,
-  Briefcase, Target, Users, Phone,
+  Briefcase, Target, Users, Phone, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import type { ElementType } from "react";
-import { RolesChart } from "./charts";
+import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
-import { RecentPostings } from "./recent-postings";
-
-const SOURCE_LABELS: Record<string, string> = {
-  linkedin:         "LinkedIn",
-  indeed:           "Indeed",
-  ziprecruiter:     "ZipRecruiter",
-  glassdoor:        "Glassdoor",
-  website:          "Web",
-  brokerage_portal: "Portal",
-};
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -28,11 +17,12 @@ export default async function DashboardPage() {
     activePostingsPrior,
     targetPostings,
     isaCount,
-    isaAllPostings,
+    locationPostings,
     topRoles,
     totalActive,
     targetTeamActivity,
     lastScrapedRow,
+    recentPostings,
   ] = await Promise.all([
     prisma.jobPosting.count({
       where: { isActive: true, createdAt: { gte: thirtyDaysAgo } },
@@ -51,24 +41,16 @@ export default async function DashboardPage() {
       },
     }),
     prisma.jobPosting.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { title: { contains: "Inside Sales", mode: "insensitive" } },
-          { title: { startsWith: "ISA",        mode: "insensitive" } },
-          { title: { contains: "Lead Manager", mode: "insensitive" } },
-          { title: { contains: "Team Lead",    mode: "insensitive" } },
-        ],
-      },
-      select: { id: true, title: true, company: true, location: true, url: true, source: true, postedAt: true, createdAt: true, isTop100: true },
-      orderBy: { createdAt: "desc" },
+      where:   { isActive: true, location: { not: null } },
+      select:  { location: true },
+      take:    500,
     }),
     prisma.jobPosting.groupBy({
       by:      ["title"],
       where:   { isActive: true },
       _count:  { title: true },
       orderBy: { _count: { title: "desc" } },
-      take:    8,
+      take:    1,
     }),
     prisma.jobPosting.count({ where: { isActive: true } }),
     prisma.jobPosting.groupBy({
@@ -77,72 +59,62 @@ export default async function DashboardPage() {
       _count:  { company: true },
       _max:    { createdAt: true },
       orderBy: { _count: { company: "desc" } },
-      take:    6,
+      take:    8,
     }),
     prisma.jobBoard.findFirst({
       where:   { lastScraped: { not: null } },
       orderBy: { lastScraped: "desc" },
       select:  { lastScraped: true },
     }),
+    prisma.jobPosting.findMany({
+      orderBy: { scrapedAt: "desc" },
+      take:    10,
+      select:  { id: true, title: true, company: true, location: true, url: true, scrapedAt: true, isTop100: true },
+    }),
   ]);
 
-  // Top companies per role (for tooltip)
-  const topRoleNames = topRoles.map((r) => r.title);
-  const companyRows = topRoleNames.length > 0
-    ? await prisma.jobPosting.groupBy({
-        by:    ["title", "company"],
-        where: { isActive: true, title: { in: topRoleNames } },
-        _count: { title: true },
+  // Latest role title per target team (for row display)
+  const targetCompanyNames = targetTeamActivity.map((t) => t.company);
+  const latestTitleRows = targetCompanyNames.length > 0
+    ? await prisma.jobPosting.findMany({
+        where:    { company: { in: targetCompanyNames }, isTop100: true, isActive: true },
+        orderBy:  { createdAt: "desc" },
+        distinct: ["company"],
+        select:   { company: true, title: true },
       })
     : [];
+  const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company, p.title]));
 
-  const companyGroups: Record<string, { company: string; count: number }[]> = {};
-  for (const row of companyRows) {
-    if (!companyGroups[row.title]) companyGroups[row.title] = [];
-    companyGroups[row.title].push({ company: row.company, count: row._count.title });
-  }
-  const topCompaniesMap: Record<string, string[]> = {};
-  for (const [role, entries] of Object.entries(companyGroups)) {
-    topCompaniesMap[role] = entries
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3)
-      .map((e) => e.company);
-  }
+  // Stat card trend
+  const trendPct = activePostingsPrior > 0
+    ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)
+    : null;
 
   const activelyHiringTeams = targetTeamActivity.length;
 
-  const trendPct =
-    activePostingsPrior > 0
-      ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)
-      : null;
+  // ── Market Snapshot ────────────────────────────────────────────────────────
 
-  // ISA Signal Tracker
-  const isaTargetCount   = isaAllPostings.filter((p) => p.isTop100).length;
-  const targetIsaPostings = isaAllPostings.filter((p) => p.isTop100).slice(0, 6);
-  const isaDays = isaAllPostings.map((p) => {
-    const d = p.postedAt ?? p.createdAt;
-    return Math.floor((Date.now() - d.getTime()) / 86400000);
-  });
-  const avgDaysPosted = isaDays.length > 0
-    ? Math.round(isaDays.reduce((a, b) => a + b, 0) / isaDays.length)
+  // Insight 1: most in-demand role
+  const topRole    = topRoles[0] ?? null;
+  const topRolePct = topRole && totalActive > 0
+    ? Math.round((topRole._count.title / totalActive) * 100)
     : 0;
+
+  // Insight 2: hottest state
   const stateCounts: Record<string, number> = {};
-  for (const p of isaAllPostings) {
+  for (const p of locationPostings) {
     if (!p.location) continue;
     const m = p.location.match(/,\s*([A-Z]{2})(?:\s|$)/);
     if (m) stateCounts[m[1]] = (stateCounts[m[1]] ?? 0) + 1;
   }
-  const topIsaStates = Object.entries(stateCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 4);
+  const topStateEntry = Object.entries(stateCounts).sort(([, a], [, b]) => b - a)[0] ?? null;
 
-  // Roles chart
-  const rolesData = topRoles.map((r) => ({
-    role:         r.title,
-    count:        r._count.title,
-    pct:          totalActive > 0 ? Math.round((r._count.title / totalActive) * 100) : 0,
-    topCompanies: topCompaniesMap[r.title] ?? [],
-  }));
+  // Insight 3: top target account
+  const topTeam = targetTeamActivity[0] ?? null;
+
+  // Insight 4: ISA share
+  const isaPct   = totalActive > 0 ? Math.round((isaCount / totalActive) * 100) : 0;
+  const isaAbove  = isaPct >= 30;
 
   return (
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
@@ -159,7 +131,7 @@ export default async function DashboardPage() {
         <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
       </div>
 
-      {/* ── Stat cards ──────────────────────────────────────────────────────── */}
+      {/* ── ROW 1: Stat cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Active Postings"
@@ -172,184 +144,182 @@ export default async function DashboardPage() {
         <StatCard
           label="Target Account Postings"
           value={targetPostings.toLocaleString()}
-          sub="Top 100 active roles"
+          sub="from Top 100 teams"
           color="#8B5CF6"
           icon={Target}
         />
         <StatCard
           label="Actively Hiring Teams"
           value={activelyHiringTeams.toLocaleString()}
-          sub="Top 100 with live postings"
+          sub="Top 100 with live roles"
           color="#06B6D4"
           icon={Users}
         />
         <StatCard
           label="ISA Roles Open"
           value={isaCount.toLocaleString()}
-          sub="Inside Sales roles"
+          sub="active ISA postings"
           color="#F59E0B"
           icon={Phone}
         />
       </div>
 
-      {/* ── Charts row (60 / 40) ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-5 gap-6 mb-6 items-start">
-        <div className="col-span-3 bg-surface border border-edge rounded-xl overflow-hidden">
-          <div style={{ height: 3, background: "#F59E0B" }} />
-          <div className="p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
-                  ISA Signal Tracker
-                </p>
-                <p className="text-xs text-fg3">Inside Sales hiring across your target accounts</p>
-              </div>
-              <Phone size={15} className="text-amber-400 shrink-0" />
-            </div>
-
-            {/* Section 1 — mini stats */}
-            <div className="flex rounded-lg border border-edge divide-x divide-edge mb-5">
-              <div className="flex-1 px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">ISA Roles Active</p>
-                <p className="text-2xl font-bold text-white">{isaAllPostings.length}</p>
-              </div>
-              <div className="flex-1 px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">From Target Accounts</p>
-                <p className="text-2xl font-bold text-white">{isaTargetCount}</p>
-              </div>
-              <div className="flex-1 px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">Avg Days Posted</p>
-                <p className="text-2xl font-bold text-white">{avgDaysPosted > 0 ? avgDaysPosted : "—"}</p>
-              </div>
-            </div>
-
-            {/* Section 2 — target accounts hiring ISA */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-2">
-                Target Accounts Hiring ISA Now
-              </p>
-              {targetIsaPostings.length === 0 ? (
-                <div className="flex items-center gap-2 py-5 text-fg3">
-                  <Phone size={14} />
-                  <span className="text-sm">No target accounts hiring ISA right now</span>
-                </div>
-              ) : (
-                <div className="divide-y divide-edge -mx-6">
-                  {targetIsaPostings.map((p) => (
-                    <a
-                      key={p.id}
-                      href={p.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-6 py-2.5 hover:bg-surface-raised transition-colors"
-                    >
-                      <span className="flex-1 min-w-0 text-[13px] font-semibold text-white truncate">{p.company}</span>
-                      <span className="text-xs text-fg2 shrink-0 max-w-[140px] truncate">{p.title}</span>
-                      <span className="text-[11px] text-fg3 shrink-0">{SOURCE_LABELS[p.source] ?? p.source}</span>
-                      <span className="text-[11px] text-fg3 shrink-0">
-                        {timeAgo(p.postedAt?.toISOString() ?? p.createdAt.toISOString())}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Section 3 — top states */}
-            {topIsaStates.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-edge">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-2">
-                  Top States for ISA Hiring
-                </p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {topIsaStates.map(([state, count]) => (
-                    <span
-                      key={state}
-                      className="text-[10px] px-2 py-1 bg-surface-raised border border-edge rounded text-fg2"
-                    >
-                      {state} {count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      {/* ── ROW 2: Market Snapshot ──────────────────────────────────────────── */}
+      <div className="bg-surface border border-edge rounded-xl p-6 mb-6">
+        <div className="flex items-center gap-2 mb-5">
+          <Sparkles size={15} className="text-indigo-400" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
+            Market Snapshot
+          </p>
         </div>
-        <div className="col-span-2 bg-surface border border-edge rounded-xl p-6">
-          <div className="flex items-center justify-between mb-0.5">
+        <div className="grid grid-cols-2 gap-3">
+
+          {/* Insight 1 — Most in-demand role */}
+          {topRole ? (
+            <InsightPill dotColor="#6366F1">
+              Most hired role is{" "}
+              <span className="text-white font-semibold">{topRole.title}</span>
+              {" "}— {topRole._count.title.toLocaleString()} open positions ({topRolePct}% of all postings)
+            </InsightPill>
+          ) : (
+            <InsightPill dotColor="#6366F1">No posting data yet — run a scrape to populate.</InsightPill>
+          )}
+
+          {/* Insight 2 — Hottest state */}
+          {topStateEntry ? (
+            <InsightPill dotColor="#06B6D4">
+              Most hiring activity in{" "}
+              <span className="text-white font-semibold">{topStateEntry[0]}</span>
+              {" "}with {topStateEntry[1].toLocaleString()} open roles
+            </InsightPill>
+          ) : (
+            <InsightPill dotColor="#06B6D4">No location data yet — state breakdown will appear after a scrape.</InsightPill>
+          )}
+
+          {/* Insight 3 — Top target account */}
+          {topTeam ? (
+            <InsightPill dotColor="#F59E0B">
+              <span className="text-white font-semibold">{topTeam.company}</span>
+              {" "}is your most active target account —{" "}
+              {topTeam._count.company} open {topTeam._count.company === 1 ? "role" : "roles"} right now
+            </InsightPill>
+          ) : (
+            <InsightPill dotColor="#F59E0B">No target account postings yet — run a scrape to find hiring signals.</InsightPill>
+          )}
+
+          {/* Insight 4 — ISA share */}
+          <InsightPill dotColor={isaAbove ? "#22C55E" : "#F59E0B"}>
+            ISA roles represent{" "}
+            <span className="text-white font-semibold">{isaPct}%</span>
+            {" "}of all real estate hiring —{" "}
+            <span className={isaAbove ? "text-green-400" : "text-amber-400"}>
+              {isaAbove ? "above" : "below"}
+            </span>
+            {" "}market average of 30%
+          </InsightPill>
+
+        </div>
+      </div>
+
+      {/* ── ROW 3: Two columns ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-[55fr_45fr] gap-6">
+
+        {/* LEFT — Target Accounts Hiring Now */}
+        <div className="bg-surface border border-edge rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
-              Top Roles Being Hired
+              Target Accounts Hiring Now
             </p>
             <Link
-              href="/patterns"
+              href="/signals"
               className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
             >
               View all →
             </Link>
           </div>
-          <p className="text-xs text-fg3 mb-5">By active posting count · last 30 days</p>
-          <RolesChart data={rolesData} />
-        </div>
-      </div>
-
-      {/* ── Bottom row (50 / 50) ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-6">
-
-        {/* Target Account Activity */}
-        <div className="bg-surface border border-edge rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
-                Target Account Activity
-              </p>
-              <p className="text-xs text-fg3">Top 100 teams with live postings</p>
-            </div>
-          </div>
 
           {targetTeamActivity.length === 0 ? (
             <p className="text-fg3 text-sm py-8 text-center">
-              No target account activity yet — run a scrape to check.
+              No target account postings yet. Run a scrape to populate.
             </p>
           ) : (
-            <>
-              <div className="divide-y divide-edge">
-                {targetTeamActivity.map((t) => (
-                  <div
-                    key={t.company}
-                    className="flex items-center justify-between py-3 gap-3"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Star size={11} className="text-amber-400 shrink-0" />
-                      <span className="text-sm text-white font-bold truncate">
-                        {t.company}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="bg-indigo-500/15 text-indigo-400 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                        {t._count.company}
-                      </span>
-                      <span className="text-xs text-fg3">
-                        {timeAgo(t._max.createdAt?.toISOString() ?? null)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-3 border-t border-edge">
+            <div className="divide-y divide-edge -mx-6">
+              {targetTeamActivity.map((t) => (
                 <Link
+                  key={t.company}
                   href="/signals"
-                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="flex items-center gap-3 px-6 py-3 hover:bg-surface-raised transition-colors"
                 >
-                  View all in Signals →
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-white truncate">{t.company}</p>
+                    {latestTitleMap.get(t.company) && (
+                      <p className="text-xs text-fg2 truncate mt-0.5">
+                        {latestTitleMap.get(t.company)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="bg-indigo-500/15 text-indigo-400 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                      {t._count.company} {t._count.company === 1 ? "role" : "roles"}
+                    </span>
+                    <span className="text-xs text-fg3 whitespace-nowrap">
+                      {timeAgo(t._max.createdAt?.toISOString() ?? null)}
+                    </span>
+                  </div>
                 </Link>
-              </div>
-            </>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Recent Postings */}
-        <RecentPostings />
+        {/* RIGHT — Recent Postings */}
+        <div className="bg-surface border border-edge rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
+              Recent Postings
+            </p>
+            <Link
+              href="/postings"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              View all →
+            </Link>
+          </div>
+
+          {recentPostings.length === 0 ? (
+            <p className="text-fg3 text-sm py-8 text-center">No postings yet.</p>
+          ) : (
+            <div className="divide-y divide-edge -mx-6">
+              {recentPostings.map((p) => (
+                <a
+                  key={p.id}
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-6 py-2.5 hover:bg-surface-raised transition-colors"
+                >
+                  <span
+                    className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleBadge(p.title)}`}
+                  >
+                    {p.title.length > 18 ? p.title.slice(0, 18) + "…" : p.title}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {p.isTop100 && <Star size={10} className="text-amber-400 shrink-0" />}
+                      <span className="text-sm text-white font-medium truncate">{p.company}</span>
+                    </div>
+                    {p.location && (
+                      <span className="text-[11px] text-fg3 truncate block">{p.location}</span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-fg3 shrink-0 whitespace-nowrap">
+                    {timeAgo(p.scrapedAt.toISOString())}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -368,7 +338,34 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+function roleBadge(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("inside sales") || /\bisa\b/.test(t))
+    return "bg-indigo-500/15 text-indigo-400";
+  if (t.includes("marketing"))
+    return "bg-purple-500/15 text-purple-400";
+  if (t.includes("operations") || t.includes("admin") || t.includes("manager"))
+    return "bg-blue-500/15 text-blue-400";
+  if (t.includes("transaction") || t.includes("coordinator") || t.includes("listing"))
+    return "bg-green-500/15 text-green-400";
+  return "bg-surface-raised text-fg2";
+}
+
+// ── InsightPill ───────────────────────────────────────────────────────────────
+
+function InsightPill({ dotColor, children }: { dotColor: string; children: ReactNode }) {
+  return (
+    <div className="bg-surface-raised border border-edge rounded-xl p-4 flex items-start gap-3">
+      <span
+        className="w-2 h-2 rounded-full shrink-0 mt-1"
+        style={{ background: dotColor }}
+      />
+      <p className="text-[13px] text-fg2 leading-snug">{children}</p>
+    </div>
+  );
+}
+
+// ── StatCard ──────────────────────────────────────────────────────────────────
 
 function StatCard({
   label, value, sub, trend, color, icon: Icon,
