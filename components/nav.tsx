@@ -14,72 +14,132 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 
-const LINKS = [
-  { href: "/dashboard", label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/postings",  label: "Postings",      icon: Briefcase },
-  { href: "/patterns",  label: "Patterns",      icon: TrendingUp },
-  { href: "/top100",    label: "Top 100 Teams", icon: Trophy },
-  { href: "/signals",   label: "Signals",        icon: Zap },
-  { href: "/sources",   label: "Sources",       icon: Database },
-  { href: "/settings",  label: "Settings",      icon: Settings },
-] as const;
+interface NavItem {
+  href:  string;
+  label: string;
+  icon:  LucideIcon;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Primary",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/postings",  label: "Postings",  icon: Briefcase },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { href: "/patterns", label: "Patterns", icon: TrendingUp },
+      { href: "/signals",  label: "Signals",  icon: Zap },
+    ],
+  },
+  {
+    label: "Accounts",
+    items: [
+      { href: "/top100", label: "Top 100 Teams", icon: Trophy },
+    ],
+  },
+  {
+    label: "Config",
+    items: [
+      { href: "/sources",  label: "Sources",  icon: Database },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+];
 
 export function Nav() {
-  const pathname = usePathname();
+  const pathname   = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <nav
-      className={`shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col h-screen sticky top-0 transition-all duration-200 ${
-        collapsed ? "w-16" : "w-64"
+      className={`shrink-0 bg-surface border-r border-edge flex flex-col h-screen sticky top-0 transition-all duration-200 ${
+        collapsed ? "w-[60px]" : "w-[240px]"
       }`}
     >
+      {/* Indigo brand accent */}
+      <div className="h-0.5 bg-indigo-500 w-full shrink-0" />
+
       {/* Logo */}
-      <div className={`flex items-center border-b border-gray-800 ${collapsed ? "justify-center px-0 py-5" : "gap-3 px-6 py-5"}`}>
-        <Radar size={22} className="text-blue-400 shrink-0" />
+      <div
+        className={`flex items-center h-16 shrink-0 border-b border-edge ${
+          collapsed ? "justify-center px-0" : "gap-2.5 px-6"
+        }`}
+      >
+        <Radar size={20} className="text-indigo-400 shrink-0" />
         {!collapsed && (
-          <span className="text-white font-bold text-lg tracking-tight">
+          <span className="text-white font-semibold text-[15px] tracking-tight">
             RoleRadar
           </span>
         )}
       </div>
 
-      {/* Links */}
-      <div className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {LINKS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                collapsed ? "justify-center" : ""
-              } ${
-                active
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-400 hover:bg-gray-800 hover:text-white"
-              }`}
-            >
-              <Icon size={17} className="shrink-0" />
-              {!collapsed && label}
-            </Link>
-          );
-        })}
+      {/* Nav groups */}
+      <div className="flex-1 px-2 py-4 overflow-y-auto">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label} className={gi > 0 ? "mt-5" : ""}>
+            {!collapsed && (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3 mb-1.5 select-none">
+                {group.label}
+              </p>
+            )}
+            {collapsed && gi > 0 && (
+              <div className="border-t border-edge mx-1 mb-3" />
+            )}
+            <div className="space-y-0.5">
+              {group.items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(href + "/");
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={collapsed ? label : undefined}
+                    className={[
+                      "flex items-center gap-2.5 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                      collapsed
+                        ? "justify-center px-2"
+                        : "border-l-2 pl-[10px] pr-3",
+                      active
+                        ? collapsed
+                          ? "bg-indigo-500/10 text-indigo-400"
+                          : "border-indigo-500 bg-indigo-500/10 text-indigo-400"
+                        : collapsed
+                          ? "text-fg2 hover:bg-surface-raised hover:text-white"
+                          : "border-transparent text-fg2 hover:bg-surface-raised hover:text-white",
+                    ].join(" ")}
+                  >
+                    <Icon size={16} className="shrink-0" />
+                    {!collapsed && label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Collapse toggle */}
-      <div className="px-2 py-4 border-t border-gray-800">
+      <div className="px-2 py-3 border-t border-edge shrink-0">
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-800 hover:text-gray-300 transition-colors w-full ${
-            collapsed ? "justify-center" : ""
+          className={`flex items-center gap-2 py-2 rounded-lg text-fg3 hover:bg-surface-raised hover:text-fg2 transition-colors w-full ${
+            collapsed ? "justify-center px-0" : "px-3"
           }`}
         >
-          {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+          {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           {!collapsed && <span className="text-xs">Collapse</span>}
         </button>
       </div>
