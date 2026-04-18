@@ -17,6 +17,7 @@ export default async function DashboardPage() {
     isaCount,
     dailyRaw,
     topRoles,
+    totalActive,
     targetTeamActivity,
     lastScrapedRow,
   ] = await Promise.all([
@@ -45,8 +46,9 @@ export default async function DashboardPage() {
       where:   { isActive: true },
       _count:  { title: true },
       orderBy: { _count: { title: "desc" } },
-      take:    6,
+      take:    8,
     }),
+    prisma.jobPosting.count({ where: { isActive: true } }),
     prisma.jobPosting.groupBy({
       by:      ["company"],
       where:   { isTop100: true, isActive: true },
@@ -61,6 +63,29 @@ export default async function DashboardPage() {
       select:  { lastScraped: true },
     }),
   ]);
+
+  // Top companies per role (for tooltip)
+  const topRoleNames = topRoles.map((r) => r.title);
+  const companyRows = topRoleNames.length > 0
+    ? await prisma.jobPosting.groupBy({
+        by:    ["title", "company"],
+        where: { isActive: true, title: { in: topRoleNames } },
+        _count: { title: true },
+      })
+    : [];
+
+  const companyGroups: Record<string, { company: string; count: number }[]> = {};
+  for (const row of companyRows) {
+    if (!companyGroups[row.title]) companyGroups[row.title] = [];
+    companyGroups[row.title].push({ company: row.company, count: row._count.title });
+  }
+  const topCompaniesMap: Record<string, string[]> = {};
+  for (const [role, entries] of Object.entries(companyGroups)) {
+    topCompaniesMap[role] = entries
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3)
+      .map((e) => e.company);
+  }
 
   const activelyHiringTeams = targetTeamActivity.length;
 
@@ -80,11 +105,11 @@ export default async function DashboardPage() {
     .map(([date, count]) => ({ date: date.slice(5), count }));
 
   // Roles chart
-  const roleTotal = topRoles.reduce((s, r) => s + r._count.title, 0);
   const rolesData = topRoles.map((r) => ({
-    role:  r.title.length > 28 ? r.title.slice(0, 28) + "…" : r.title,
-    count: r._count.title,
-    pct:   roleTotal > 0 ? Math.round((r._count.title / roleTotal) * 100) : 0,
+    role:         r.title,
+    count:        r._count.title,
+    pct:          totalActive > 0 ? Math.round((r._count.title / totalActive) * 100) : 0,
+    topCompanies: topCompaniesMap[r.title] ?? [],
   }));
 
   return (
@@ -138,10 +163,18 @@ export default async function DashboardPage() {
           <VolumeChart data={volumeData} />
         </div>
         <div className="col-span-2 bg-surface border border-edge rounded-xl p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
-            Top Roles Being Hired
-          </p>
-          <p className="text-xs text-fg3 mb-5">Top 6 by active posting count</p>
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
+              Top Roles Being Hired
+            </p>
+            <Link
+              href="/patterns"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              View all →
+            </Link>
+          </div>
+          <p className="text-xs text-fg3 mb-5">By active posting count · last 30 days</p>
           <RolesChart data={rolesData} />
         </div>
       </div>

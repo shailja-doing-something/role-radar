@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -23,7 +24,9 @@ const TOOLTIP_STYLE = {
 };
 
 interface VolumePoint { date: string; count: number }
-interface RolePoint   { role: string; count: number; pct: number }
+interface RolePoint   { role: string; count: number; pct: number; topCompanies?: string[] }
+
+// ── Volume chart (recharts) ────────────────────────────────────────────────────
 
 export function VolumeChart({ data }: { data: VolumePoint[] }) {
   if (data.length === 0)
@@ -52,46 +55,131 @@ export function VolumeChart({ data }: { data: VolumePoint[] }) {
   );
 }
 
+// ── Roles chart (custom HTML) ──────────────────────────────────────────────────
+
 export function RolesChart({ data }: { data: RolePoint[] }) {
+  const [mounted, setMounted] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
   if (data.length === 0)
     return <ChartEmpty text="No role data yet — run a scrape" />;
 
+  const maxCount = Math.max(...data.map((d) => d.count));
+
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
-      >
-        <XAxis
-          type="number"
-          tick={{ fill: "#4A4A60", fontSize: 11 }}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          type="category"
-          dataKey="role"
-          tick={{ fill: "#8B8BA0", fontSize: 11 }}
-          tickLine={false}
-          axisLine={false}
-          width={118}
-        />
-        <Tooltip
-          {...TOOLTIP_STYLE}
-          formatter={(value) => [`${value}`, "Postings"]}
-        />
-        <Bar
-          dataKey="count"
-          name="Postings"
-          fill="#6366F1"
-          radius={[0, 3, 3, 0]}
-          maxBarSize={16}
-        />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="flex flex-col gap-2">
+      {data.map((item, i) => {
+        const barWidth   = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
+        const rankOpacity = data.length > 1
+          ? 1.0 - (i / (data.length - 1)) * 0.6
+          : 1;
+
+        const isOther     = item.role.startsWith("Other: ");
+        const displayRole = isOther ? item.role.slice(7) : item.role;
+        const isHovered   = hovered === i;
+
+        return (
+          <div
+            key={i}
+            className="relative flex items-center gap-3 rounded-lg px-2 cursor-pointer"
+            style={{
+              height:     44,
+              background: isHovered ? "#1C1C27" : "transparent",
+              transition: "background 150ms",
+            }}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            {/* ── Label ───────────────────────────────────────────────────── */}
+            <div
+              className="text-right shrink-0 flex items-center justify-end gap-1.5 overflow-hidden"
+              style={{ width: 150 }}
+            >
+              {isOther && (
+                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide bg-surface-raised border border-edge text-fg3 px-1 py-px rounded">
+                  Other
+                </span>
+              )}
+              <span
+                className="text-xs text-fg2 whitespace-nowrap overflow-hidden block"
+                style={{ textOverflow: "ellipsis" }}
+                title={displayRole}
+              >
+                {displayRole}
+              </span>
+            </div>
+
+            {/* ── Bar track + animated fill ────────────────────────────────── */}
+            <div className="flex-1 relative" style={{ height: 12 }}>
+              {/* Track */}
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{ background: "#1C1C27" }}
+              />
+              {/* Fill */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{
+                  width:            mounted ? `${barWidth}%` : "0%",
+                  transition:       `width 600ms ease-out ${i * 100}ms`,
+                  background:       `rgba(99, 102, 241, ${isHovered ? 1 : rankOpacity})`,
+                }}
+              />
+            </div>
+
+            {/* ── Count + pct ──────────────────────────────────────────────── */}
+            <div className="text-right shrink-0" style={{ width: 64 }}>
+              <span className="text-xs text-fg2 font-medium tabular-nums">{item.count}</span>
+              <span className="text-xs text-fg3 ml-0.5">({item.pct}%)</span>
+            </div>
+
+            {/* ── Tooltip ──────────────────────────────────────────────────── */}
+            {isHovered && (
+              <div
+                className="absolute z-50 pointer-events-none"
+                style={{
+                  left:      "calc(100% + 8px)",
+                  top:       "50%",
+                  transform: "translateY(-50%)",
+                  width:     200,
+                  background:   "#13131A",
+                  border:       "1px solid #2A2A3A",
+                  borderRadius: 8,
+                  padding:      12,
+                  boxShadow:    "0 8px 32px rgba(0,0,0,0.5)",
+                }}
+              >
+                <p className="text-white text-xs font-semibold mb-1 leading-snug">{displayRole}</p>
+                <p className="text-[#4A4A60] text-[11px] mb-2">
+                  {item.count} postings · {item.pct}% of total
+                </p>
+                {item.topCompanies && item.topCompanies.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#4A4A60] mb-1.5">
+                      Top companies
+                    </p>
+                    <div className="space-y-1">
+                      {item.topCompanies.map((c) => (
+                        <p key={c} className="text-[#8B8BA0] text-xs truncate">{c}</p>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
+
+// ── Shared empty state ─────────────────────────────────────────────────────────
 
 function ChartEmpty({ text }: { text: string }) {
   return (
