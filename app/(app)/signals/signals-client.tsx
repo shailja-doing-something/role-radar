@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Radar, Sparkles, ExternalLink, Search, Filter,
-  Zap, CheckCircle2, AlertCircle, MinusCircle, HelpCircle,
+  Zap, Sparkles, ExternalLink, Search, X,
+  CheckCircle2, AlertCircle, MinusCircle, HelpCircle,
+  ChevronDown, Check,
 } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,67 +32,326 @@ interface TeamSignal {
   liveISASignals:       ISASignal[];
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const PRESENCE_OPTIONS = ["Confirmed", "Likely", "None", "Unknown"] as const;
+type PresenceValue = (typeof PRESENCE_OPTIONS)[number];
+
+const PRESENCE: Record<PresenceValue, { badge: string; icon: React.ElementType }> = {
+  Confirmed: { badge: "bg-green-500/10 border-green-500/30 text-green-400",  icon: CheckCircle2 },
+  Likely:    { badge: "bg-amber-500/10 border-amber-500/30 text-amber-400",  icon: AlertCircle  },
+  None:      { badge: "bg-surface-raised border-edge text-fg3",              icon: MinusCircle  },
+  Unknown:   { badge: "border-edge text-fg3",                                icon: HelpCircle   },
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  linkedin:         "LI",
+  indeed:           "IN",
+  ziprecruiter:     "ZR",
+  glassdoor:        "GD",
+  website:          "Web",
+  brokerage_portal: "Portal",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function relativeDate(dateStr: string | null): string {
-  if (!dateStr) return "Unknown";
+function relDate(dateStr: string | null): string {
+  if (!dateStr) return "";
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   return `${days}d ago`;
 }
 
-const PRESENCE_STYLES: Record<string, string> = {
-  Confirmed: "bg-green-900/40 border-green-700/50 text-green-400",
-  Likely:    "bg-amber-900/40 border-amber-700/50 text-amber-400",
-  None:      "bg-gray-800/60 border-gray-700 text-gray-500",
-  Unknown:   "bg-gray-900/40 border-gray-800 text-gray-600",
-};
+function sortScore(t: TeamSignal): number {
+  if (t.isaVelocity !== "None")      return 3;
+  if (t.isaPresence === "Confirmed") return 2;
+  if (t.isaPresence === "Likely")    return 1;
+  return 0;
+}
 
-const PRESENCE_ICONS: Record<string, React.ReactNode> = {
-  Confirmed: <CheckCircle2 size={11} />,
-  Likely:    <AlertCircle  size={11} />,
-  None:      <MinusCircle  size={11} />,
-  Unknown:   <HelpCircle   size={11} />,
-};
+function presenceKey(value: string): PresenceValue {
+  return (PRESENCE_OPTIONS as readonly string[]).includes(value)
+    ? (value as PresenceValue)
+    : "Unknown";
+}
 
-const SOURCE_LABELS: Record<string, string> = {
-  linkedin:     "LI",
-  indeed:       "IN",
-  ziprecruiter: "ZR",
-  glassdoor:    "GD",
-};
+function cardAccentClasses(t: TeamSignal): string {
+  if (t.isaVelocity !== "None")      return "border-l-4 border-l-indigo-500";
+  if (t.isaPresence === "Confirmed") return "border-l-4 border-l-green-500";
+  if (t.isaPresence === "Likely")    return "border-l-4 border-l-amber-500";
+  return "";
+}
 
-function PresenceBadge({ value }: { value: string }) {
+// ── PresencePicker ─────────────────────────────────────────────────────────────
+
+function PresencePicker({
+  value,
+  onChange,
+}: {
+  value:    string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref  = useRef<HTMLDivElement>(null);
+  const key  = presenceKey(value);
+  const { badge, icon: Icon } = PRESENCE[key];
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${PRESENCE_STYLES[value] ?? PRESENCE_STYLES.Unknown}`}>
-      {PRESENCE_ICONS[value] ?? PRESENCE_ICONS.Unknown}
-      {value}
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded border transition-opacity hover:opacity-80 ${badge}`}
+      >
+        <Icon size={10} />
+        {value}
+        <ChevronDown size={9} className="opacity-50 ml-0.5" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-40 bg-surface-raised border border-edge rounded-lg shadow-2xl overflow-hidden min-w-[140px]">
+          {PRESENCE_OPTIONS.map((opt) => {
+            const { badge: oBadge, icon: OIcon } = PRESENCE[opt];
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { onChange(opt); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface transition-colors"
+              >
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${oBadge}`}
+                >
+                  <OIcon size={9} />
+                  {opt}
+                </span>
+                {opt === value && (
+                  <Check size={10} className="ml-auto text-fg2 shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── VelocityBadge ─────────────────────────────────────────────────────────────
+
+function VelocityBadge({ velocity }: { velocity: "Hot" | "Active" | "None" }) {
+  if (velocity === "None") return null;
+  const cls    = velocity === "Hot"
+    ? "bg-red-500/10 border-red-500/30 text-red-400"
+    : "bg-amber-500/10 border-amber-500/30 text-amber-400";
+  const dotCls = velocity === "Hot" ? "bg-red-400 animate-pulse" : "bg-amber-400";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${cls}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
+      {velocity} Hiring
     </span>
+  );
+}
+
+// ── StatCard ──────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, accent,
+}: {
+  label:   string;
+  value:   number;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl p-6 border ${
+        accent
+          ? "bg-indigo-500/5 border-indigo-500/30"
+          : "bg-surface border-edge"
+      }`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-3">
+        {label}
+      </p>
+      <p className={`text-[32px] font-bold leading-none ${accent ? "text-indigo-400" : "text-white"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ── FilterSelect ──────────────────────────────────────────────────────────────
+
+function FilterSelect({
+  label, value, onChange, options,
+}: {
+  label:    string;
+  value:    string;
+  onChange: (v: string) => void;
+  options:  string[];
+}) {
+  const active = !!value;
+  return (
+    <div
+      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-colors ${
+        active
+          ? "bg-indigo-500/10 border-indigo-500/30"
+          : "bg-surface border-edge"
+      }`}
+    >
+      <select
+        className={`bg-transparent text-sm outline-none cursor-pointer ${
+          active ? "text-indigo-300" : "text-fg2"
+        }`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">All — {label}</option>
+        {options.map((o) => (
+          <option key={o} value={o} className="bg-surface-raised text-white">
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ── TeamCard ──────────────────────────────────────────────────────────────────
+
+function TeamCard({
+  team,
+  onUpdate,
+}: {
+  team:     TeamSignal;
+  onUpdate: (id: number, field: "isaPresence" | "marketingOpsPresence", value: string) => void;
+}) {
+  const siteHref = team.website
+    ? team.website.startsWith("http")
+      ? team.website
+      : `https://${team.website}`
+    : null;
+
+  return (
+    <div
+      className={`bg-surface border border-edge rounded-xl p-4 grid grid-cols-[30%_1fr_1fr] ${cardAccentClasses(team)}`}
+    >
+      {/* ── Left: team info ──────────────────────────────────────────────── */}
+      <div className="pr-4 min-w-0">
+        <p className="text-[15px] font-semibold text-white leading-snug truncate">
+          {team.name}
+        </p>
+        {team.brokerage && (
+          <p className="text-xs text-fg2 truncate mt-0.5">{team.brokerage}</p>
+        )}
+        {team.location && (
+          <p className="text-xs text-fg3 mt-0.5">{team.location}</p>
+        )}
+        {siteHref && (
+          <a
+            href={siteHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors mt-2"
+          >
+            <ExternalLink size={10} />
+            website
+          </a>
+        )}
+      </div>
+
+      {/* ── Center: ISA hiring activity ──────────────────────────────────── */}
+      <div className="border-x border-edge px-4 min-w-0">
+        {team.liveISASignals.length === 0 ? (
+          <p className="text-fg3 text-sm">No active hiring</p>
+        ) : (
+          <>
+            <VelocityBadge velocity={team.isaVelocity} />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {team.liveISASignals.slice(0, 4).map((sig) => (
+                <a
+                  key={sig.id}
+                  href={sig.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] bg-surface-raised border border-edge hover:border-indigo-500/40 text-fg2 hover:text-white px-2 py-0.5 rounded transition-colors"
+                >
+                  <span className="font-semibold text-indigo-400 shrink-0">
+                    {SOURCE_LABEL[sig.source] ?? sig.source.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="truncate max-w-[90px]">{sig.normalizedRole}</span>
+                  <ExternalLink size={8} className="shrink-0 text-fg3" />
+                </a>
+              ))}
+              {team.liveISASignals.length > 4 && (
+                <span className="text-[11px] text-fg3 px-1 py-0.5">
+                  +{team.liveISASignals.length - 4} more
+                </span>
+              )}
+            </div>
+            {team.liveISASignals[0]?.postedAt && (
+              <p className="text-[11px] text-fg3 mt-2">
+                Last: {relDate(team.liveISASignals[0].postedAt)}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Right: presence pickers ──────────────────────────────────────── */}
+      <div className="pl-4 space-y-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1.5">
+            ISA Structure
+          </p>
+          <PresencePicker
+            value={team.isaPresence}
+            onChange={(v) => onUpdate(team.id, "isaPresence", v)}
+          />
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1.5">
+            Mktg &amp; Ops
+          </p>
+          <PresencePicker
+            value={team.marketingOpsPresence}
+            onChange={(v) => onUpdate(team.id, "marketingOpsPresence", v)}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function SignalsClient() {
-  const [teams,    setTeams]    = useState<TeamSignal[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const { toast } = useToast();
+  const [teams,   setTeams]   = useState<TeamSignal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [search,        setSearch]        = useState("");
-  const [filterISA,     setFilterISA]     = useState("");
-  const [filterVelocity,setFilterVelocity]= useState("");
-  const [filterMktg,    setFilterMktg]    = useState("");
+  const [search,         setSearch]         = useState("");
+  const [filterISA,      setFilterISA]      = useState("");
+  const [filterVelocity, setFilterVelocity] = useState("");
+  const [filterMktg,     setFilterMktg]     = useState("");
 
-  // Auto-detect
   const [detecting,      setDetecting]      = useState(false);
   const [detectProgress, setDetectProgress] = useState(0);
   const [detectTotal,    setDetectTotal]    = useState(0);
 
-  // Toast
-  const [toast, setToast] = useState<string | null>(null);
-
-  // ── Fetch data ──────────────────────────────────────────────────────────────
+  // ── Load ──────────────────────────────────────────────────────────────────
   const loadSignals = useCallback(async () => {
     setLoading(true);
     try {
@@ -103,33 +365,31 @@ export function SignalsClient() {
 
   useEffect(() => { loadSignals(); }, [loadSignals]);
 
-  // ── Toast helper ────────────────────────────────────────────────────────────
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4500);
-  }
-
-  // ── Optimistic inline update ────────────────────────────────────────────────
+  // ── Optimistic update ─────────────────────────────────────────────────────
   async function updatePresence(
     id:    number,
     field: "isaPresence" | "marketingOpsPresence",
     value: string,
   ) {
-    setTeams(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
-    await fetch(`/api/signals/${id}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ [field]: value }),
-    });
+    setTeams((prev) => prev.map((t) => t.id === id ? { ...t, [field]: value } : t));
+    try {
+      await fetch(`/api/signals/${id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ [field]: value }),
+      });
+    } catch {
+      toast("Failed to save — please try again", "error");
+    }
   }
 
-  // ── Auto-detect ─────────────────────────────────────────────────────────────
+  // ── Auto-detect ───────────────────────────────────────────────────────────
   async function runAutoDetect() {
     const unknowns = teams.filter(
-      t => t.isaPresence === "Unknown" || t.marketingOpsPresence === "Unknown"
+      (t) => t.isaPresence === "Unknown" || t.marketingOpsPresence === "Unknown"
     );
     if (unknowns.length === 0) {
-      showToast("All teams already have presence signals.");
+      toast("All teams already have presence signals set.", "info");
       return;
     }
 
@@ -143,361 +403,193 @@ export function SignalsClient() {
     for (let i = 0; i < unknowns.length; i += BATCH) {
       const batch = unknowns.slice(i, i + BATCH);
       try {
-        const res  = await fetch("/api/signals/autodetect", {
+        const res = await fetch("/api/signals/autodetect", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
-            teams: batch.map(t => ({ id: t.id, name: t.name, brokerage: t.brokerage, location: t.location })),
+            teams: batch.map((t) => ({
+              id: t.id, name: t.name, brokerage: t.brokerage, location: t.location,
+            })),
           }),
         });
         if (res.ok) {
-          const { saved } = await res.json() as { saved: (TeamSignal & { reasoning: string })[] };
-          const byId = new Map(saved.map(s => [s.id, s]));
-          setTeams(prev => prev.map(t => {
-            const s = byId.get(t.id);
-            return s ? { ...t, isaPresence: s.isaPresence, marketingOpsPresence: s.marketingOpsPresence } : t;
-          }));
+          const { saved } = await res.json() as {
+            saved: (Pick<TeamSignal, "id" | "isaPresence" | "marketingOpsPresence"> & { reasoning: string })[];
+          };
+          const byId = new Map(saved.map((s) => [s.id, s]));
+          setTeams((prev) =>
+            prev.map((t) => {
+              const s = byId.get(t.id);
+              return s
+                ? { ...t, isaPresence: s.isaPresence, marketingOpsPresence: s.marketingOpsPresence }
+                : t;
+            })
+          );
           updated += saved.length;
         }
-      } catch { /* continue */ }
+      } catch { /* continue batch */ }
       setDetectProgress(Math.min(i + BATCH, unknowns.length));
     }
 
     setDetecting(false);
-    showToast(`Auto-detected presence signals for ${updated} teams.`);
+    toast(`Auto-detected presence signals for ${updated} teams.`, "success");
   }
 
-  // ── Filter + stats ──────────────────────────────────────────────────────────
-  const filtered = teams.filter(t => {
-    if (search        && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterISA     && t.isaPresence          !== filterISA)     return false;
-    if (filterMktg    && t.marketingOpsPresence !== filterMktg)    return false;
-    if (filterVelocity && t.isaVelocity         !== filterVelocity) return false;
-    return true;
-  });
+  // ── Filter + sort ─────────────────────────────────────────────────────────
+  const filtered = teams
+    .filter((t) => {
+      if (search         && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterISA      && t.isaPresence          !== filterISA)      return false;
+      if (filterMktg     && t.marketingOpsPresence !== filterMktg)     return false;
+      if (filterVelocity && t.isaVelocity          !== filterVelocity) return false;
+      return true;
+    })
+    .sort((a, b) => sortScore(b) - sortScore(a));
 
-  const hasFilter = search || filterISA || filterMktg || filterVelocity;
+  const hasFilter = !!(search || filterISA || filterMktg || filterVelocity);
 
   const stats = {
-    isaConfirmed:    teams.filter(t => t.isaPresence          === "Confirmed").length,
-    activeHiring:    teams.filter(t => t.isaVelocity          !== "None").length,
-    mktgConfirmed:   teams.filter(t => t.marketingOpsPresence === "Confirmed").length,
-    total:           teams.length,
+    isaConfirmed:  teams.filter((t) => t.isaPresence          === "Confirmed").length,
+    activeHiring:  teams.filter((t) => t.isaVelocity          !== "None").length,
+    mktgConfirmed: teams.filter((t) => t.marketingOpsPresence === "Confirmed").length,
+    total:         teams.length,
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  function clearFilters() {
+    setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg("");
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 relative">
+    <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gray-800 border border-gray-700 text-white text-sm px-4 py-3 rounded-xl shadow-xl animate-in slide-in-from-bottom-2">
-          {toast}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
-            <Radar size={22} className="text-blue-400" />
-            Team Signals
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Live hiring intelligence across your Top 100 target accounts.
+          <div className="flex items-center gap-2.5 mb-1">
+            <Zap size={20} className="text-indigo-400" />
+            <h1 className="text-2xl font-semibold text-white">Team Signals</h1>
+          </div>
+          <p className="text-sm text-fg2">
+            Live hiring intelligence across your Top 100 target accounts
           </p>
         </div>
-
-        {/* Auto-detect */}
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-1.5">
           <button
+            type="button"
             onClick={runAutoDetect}
             disabled={detecting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Sparkles size={14} />
             {detecting
-              ? `Analyzing ${detectProgress}/${detectTotal} teams…`
-              : "Auto-detect"}
+              ? `Analyzing ${detectProgress} / ${detectTotal}…`
+              : "Auto-detect Signals"}
           </button>
-          <span className="text-gray-600 text-xs">AI estimates — verify manually</span>
+          <span className="text-xs text-fg3">AI estimates — verify manually</span>
         </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="ISA Presence Confirmed"      value={stats.isaConfirmed}  />
-        <StatCard label="Actively Hiring ISA Roles"   value={stats.activeHiring}  accent="blue" />
-        <StatCard label="Mktg / Ops Confirmed"        value={stats.mktgConfirmed} />
-        <StatCard label="Target Accounts Tracked"     value={stats.total}         />
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <StatCard label="ISA Presence Confirmed"    value={stats.isaConfirmed}  />
+        <StatCard label="Actively Hiring ISA Roles" value={stats.activeHiring}  accent />
+        <StatCard label="Mktg / Ops Confirmed"      value={stats.mktgConfirmed} />
+        <StatCard label="Target Accounts Tracked"   value={stats.total}         />
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 flex-1 min-w-48">
-          <Search size={14} className="text-gray-500 shrink-0" />
+      <div className="flex flex-col gap-2.5 mb-6">
+        <div className="flex items-center gap-2 bg-surface border border-edge rounded-lg px-3 py-2.5">
+          <Search size={14} className="text-fg3 shrink-0" />
           <input
-            className="bg-transparent text-white text-sm placeholder-gray-500 outline-none w-full"
+            className="bg-transparent text-white text-sm placeholder-fg3 outline-none flex-1"
             placeholder="Search teams…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button type="button" onClick={() => setSearch("")}>
+              <X size={13} className="text-fg3 hover:text-fg2 transition-colors" />
+            </button>
+          )}
         </div>
 
-        <SelectFilter
-          icon={<Filter size={13} className="text-gray-500" />}
-          value={filterISA}
-          onChange={setFilterISA}
-          placeholder="ISA Presence"
-        />
-        <SelectFilter
-          icon={<Zap size={13} className="text-gray-500" />}
-          value={filterVelocity}
-          onChange={setFilterVelocity}
-          placeholder="ISA Hiring"
-          options={[
-            { value: "Hot",    label: "Hot"    },
-            { value: "Active", label: "Active" },
-            { value: "None",   label: "None"   },
-          ]}
-        />
-        <SelectFilter
-          icon={<Filter size={13} className="text-gray-500" />}
-          value={filterMktg}
-          onChange={setFilterMktg}
-          placeholder="Mktg / Ops"
-        />
-
-        {hasFilter && (
-          <button
-            onClick={() => { setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg(""); }}
-            className="text-sm text-gray-400 hover:text-white px-3 transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        {/* Column headers */}
-        <div className="grid grid-cols-3 border-b border-gray-800 bg-gray-900">
-          <div className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ISA Structure</div>
-          <div className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide border-x border-gray-800">ISA Hiring Activity</div>
-          <div className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Marketing &amp; Ops</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterSelect
+            label="ISA Presence"
+            value={filterISA}
+            onChange={setFilterISA}
+            options={["Confirmed", "Likely", "None", "Unknown"]}
+          />
+          <FilterSelect
+            label="ISA Hiring"
+            value={filterVelocity}
+            onChange={setFilterVelocity}
+            options={["Hot", "Active", "None"]}
+          />
+          <FilterSelect
+            label="Mktg / Ops"
+            value={filterMktg}
+            onChange={setFilterMktg}
+            options={["Confirmed", "Likely", "None", "Unknown"]}
+          />
+          {hasFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-fg2 hover:text-white px-3 py-1.5 rounded-lg hover:bg-surface-raised transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+          <span className="ml-auto text-xs text-fg3">
+            {filtered.length} of {stats.total} teams
+          </span>
         </div>
-
-        {loading ? (
-          <SkeletonRows />
-        ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-gray-500 text-sm">No teams match your filters.</p>
-            {hasFilter && (
-              <button
-                onClick={() => { setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg(""); }}
-                className="mt-3 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-800/60">
-            {filtered.map(team => (
-              <TeamRow
-                key={team.id}
-                team={team}
-                onUpdatePresence={updatePresence}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
-      <p className="text-gray-700 text-xs mt-3 text-right">
-        {filtered.length} of {teams.length} teams
-      </p>
-    </div>
-  );
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, accent }: { label: string; value: number; accent?: "blue" }) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-3xl font-bold ${accent === "blue" ? "text-blue-400" : "text-white"}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function SelectFilter({
-  icon, value, onChange, placeholder, options,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  options?: { value: string; label: string }[];
-}) {
-  const presenceOptions = options ?? [
-    { value: "Confirmed", label: "Confirmed" },
-    { value: "Likely",    label: "Likely"    },
-    { value: "None",      label: "None"      },
-    { value: "Unknown",   label: "Unknown"   },
-  ];
-
-  return (
-    <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
-      {icon}
-      <select
-        className="bg-transparent text-sm text-gray-300 outline-none"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      >
-        <option value="">All — {placeholder}</option>
-        {presenceOptions.map(o => (
-          <option key={o.value} value={o.value} className="bg-gray-900">{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function TeamRow({
-  team,
-  onUpdatePresence,
-}: {
-  team: TeamSignal;
-  onUpdatePresence: (id: number, field: "isaPresence" | "marketingOpsPresence", value: string) => void;
-}) {
-  const mostRecent = team.liveISASignals[0]?.postedAt ?? null;
-
-  return (
-    <div className="grid grid-cols-3 hover:bg-gray-800/20 transition-colors">
-
-      {/* Col 1 — ISA Structure */}
-      <div className="px-6 py-4">
-        <PresenceDropdown
-          value={team.isaPresence}
-          onChange={v => onUpdatePresence(team.id, "isaPresence", v)}
-        />
-        <p className="text-gray-200 text-sm font-medium mt-2 truncate">{team.name}</p>
-        {team.brokerage && (
-          <p className="text-gray-500 text-xs truncate">{team.brokerage}</p>
-        )}
-        {team.location && (
-          <p className="text-gray-600 text-xs">{team.location}</p>
-        )}
-      </div>
-
-      {/* Col 2 — ISA Hiring Activity */}
-      <div className="px-6 py-4 border-x border-gray-800">
-        {team.liveISASignals.length === 0 ? (
-          <p className="text-gray-600 text-sm">No active hiring</p>
-        ) : (
-          <>
-            <VelocityBadge velocity={team.isaVelocity} />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {team.liveISASignals.slice(0, 4).map(sig => (
-                <a
-                  key={sig.id}
-                  href={sig.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-2 py-1 rounded-md border border-gray-700 transition-colors"
+      {/* Cards */}
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-surface border border-edge rounded-xl p-4 grid grid-cols-[30%_1fr_1fr]"
+            >
+              {[0, 1, 2].map((col) => (
+                <div
+                  key={col}
+                  className={`${col === 0 ? "pr-4" : "px-4"} ${col === 1 ? "border-x border-edge" : ""}`}
                 >
-                  <span className="font-medium text-blue-400">{SOURCE_LABELS[sig.source] ?? sig.source.slice(0,2).toUpperCase()}</span>
-                  <span className="truncate max-w-28">{sig.normalizedRole}</span>
-                  <ExternalLink size={9} className="shrink-0 text-gray-600" />
-                </a>
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-24 mb-1.5" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
               ))}
-              {team.liveISASignals.length > 4 && (
-                <span className="text-xs text-gray-600 px-2 py-1">
-                  +{team.liveISASignals.length - 4} more
-                </span>
-              )}
-            </div>
-            {mostRecent && (
-              <p className="text-gray-600 text-xs mt-2">
-                Last seen: {relativeDate(mostRecent)}
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Col 3 — Marketing & Ops */}
-      <div className="px-6 py-4">
-        <PresenceDropdown
-          value={team.marketingOpsPresence}
-          onChange={v => onUpdatePresence(team.id, "marketingOpsPresence", v)}
-        />
-        {team.website && (
-          <a
-            href={team.website.startsWith("http") ? team.website : `https://${team.website}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs mt-2 transition-colors"
-          >
-            <ExternalLink size={10} />
-            Visit website
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PresenceDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex items-center gap-2">
-      <PresenceBadge value={value} />
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 outline-none px-1.5 py-1 hover:border-gray-600 transition-colors"
-      >
-        <option value="Unknown">Unknown</option>
-        <option value="Confirmed">Confirmed</option>
-        <option value="Likely">Likely</option>
-        <option value="None">None</option>
-      </select>
-    </div>
-  );
-}
-
-function VelocityBadge({ velocity }: { velocity: "Hot" | "Active" | "None" }) {
-  const styles = {
-    Hot:    "bg-red-900/40 border-red-700/50 text-red-400",
-    Active: "bg-yellow-900/40 border-yellow-700/50 text-yellow-400",
-    None:   "bg-gray-800 border-gray-700 text-gray-500",
-  };
-  const dots = { Hot: "🔴", Active: "🟡", None: "" };
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${styles[velocity]}`}>
-      {dots[velocity]} {velocity} hiring
-    </span>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <div className="divide-y divide-gray-800/60">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="grid grid-cols-3 animate-pulse">
-          {[0,1,2].map(col => (
-            <div key={col} className={`px-6 py-4 ${col === 1 ? "border-x border-gray-800" : ""}`}>
-              <div className="h-4 bg-gray-800 rounded w-24 mb-2" />
-              <div className="h-3 bg-gray-800 rounded w-32 mb-1.5" />
-              <div className="h-3 bg-gray-800 rounded w-20" />
             </div>
           ))}
         </div>
-      ))}
+      ) : filtered.length === 0 ? (
+        <div className="bg-surface border border-edge rounded-xl py-16 text-center">
+          <p className="text-fg2 text-sm mb-3">No teams match your filters.</p>
+          {hasFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((team) => (
+            <TeamCard key={team.id} team={team} onUpdate={updatePresence} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
