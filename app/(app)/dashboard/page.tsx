@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { LayoutDashboard, Star, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  LayoutDashboard, Star, ArrowUp, ArrowDown,
+  Briefcase, Target, Users, Phone,
+} from "lucide-react";
 import Link from "next/link";
+import type { ElementType } from "react";
 import { VolumeChart, RolesChart } from "./charts";
 import { ScrapeButton } from "./scrape-button";
 import { RecentPostings } from "./recent-postings";
@@ -55,7 +59,7 @@ export default async function DashboardPage() {
       _count:  { company: true },
       _max:    { createdAt: true },
       orderBy: { _count: { company: "desc" } },
-      take:    8,
+      take:    6,
     }),
     prisma.jobBoard.findFirst({
       where:   { lastScraped: { not: null } },
@@ -128,33 +132,40 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Stat cards ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Active Postings"
           value={activePostings30.toLocaleString()}
           sub="last 30 days"
           trend={trendPct}
+          color="#6366F1"
+          icon={Briefcase}
         />
         <StatCard
           label="Target Account Postings"
           value={targetPostings.toLocaleString()}
           sub="Top 100 active roles"
-          accent
+          color="#8B5CF6"
+          icon={Target}
         />
         <StatCard
           label="Actively Hiring Teams"
           value={activelyHiringTeams.toLocaleString()}
           sub="Top 100 with live postings"
+          color="#06B6D4"
+          icon={Users}
         />
         <StatCard
           label="ISA Roles Open"
           value={isaCount.toLocaleString()}
           sub="Inside Sales roles"
+          color="#F59E0B"
+          icon={Phone}
         />
       </div>
 
       {/* ── Charts row (60 / 40) ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-5 gap-6 mb-8">
+      <div className="grid grid-cols-5 gap-6 mb-6 items-start">
         <div className="col-span-3 bg-surface border border-edge rounded-xl p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
             Hiring Activity
@@ -191,42 +202,46 @@ export default async function DashboardPage() {
               </p>
               <p className="text-xs text-fg3">Top 100 teams with live postings</p>
             </div>
-            <Link
-              href="/signals"
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              See all →
-            </Link>
           </div>
 
           {targetTeamActivity.length === 0 ? (
             <p className="text-fg3 text-sm py-8 text-center">
-              No target account postings yet — run a scrape.
+              No target account activity yet — run a scrape to check.
             </p>
           ) : (
-            <div className="divide-y divide-edge">
-              {targetTeamActivity.map((t) => (
-                <div
-                  key={t.company}
-                  className="flex items-center justify-between py-3 gap-3"
+            <>
+              <div className="divide-y divide-edge">
+                {targetTeamActivity.map((t) => (
+                  <div
+                    key={t.company}
+                    className="flex items-center justify-between py-3 gap-3"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Star size={11} className="text-amber-400 shrink-0" />
+                      <span className="text-sm text-white font-bold truncate">
+                        {t.company}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="bg-indigo-500/15 text-indigo-400 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                        {t._count.company}
+                      </span>
+                      <span className="text-xs text-fg3">
+                        {timeAgo(t._max.createdAt?.toISOString() ?? null)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-3 border-t border-edge">
+                <Link
+                  href="/signals"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Star size={11} className="text-amber-400 shrink-0" />
-                    <span className="text-sm text-white font-medium truncate">
-                      {t.company}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-xs text-fg2">
-                      {t._count.company} role{t._count.company !== 1 ? "s" : ""}
-                    </span>
-                    <span className="text-xs text-fg3">
-                      {timeAgo(t._max.createdAt?.toISOString() ?? null)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  View all in Signals →
+                </Link>
+              </div>
+            </>
           )}
         </div>
 
@@ -253,39 +268,39 @@ function timeAgo(iso: string | null): string {
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, sub, trend, accent,
+  label, value, sub, trend, color, icon: Icon,
 }: {
-  label:   string;
-  value:   string;
-  sub?:    string;
-  trend?:  number | null;
-  accent?: boolean;
+  label:  string;
+  value:  string;
+  sub?:   string;
+  trend?: number | null;
+  color:  string;
+  icon:   ElementType;
 }) {
   return (
-    <div
-      className={`rounded-xl p-6 border ${
-        accent
-          ? "bg-indigo-500/5 border-indigo-500/30"
-          : "bg-surface border-edge"
-      }`}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-3">
-        {label}
-      </p>
-      <p className="text-[32px] font-bold text-white leading-none mb-2">{value}</p>
-      <div className="flex items-center gap-2">
-        {trend != null && (
-          <span
-            className={`flex items-center gap-0.5 text-[11px] font-semibold ${
-              trend >= 0 ? "text-green-500" : "text-red-400"
-            }`}
-          >
-            {trend >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
-            {trend >= 0 ? "+" : ""}
-            {trend}% vs prev 30d
-          </span>
-        )}
-        {sub && <span className="text-xs text-fg3">{sub}</span>}
+    <div className="bg-surface border border-edge rounded-xl overflow-hidden">
+      <div style={{ height: 3, background: color }} />
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
+            {label}
+          </p>
+          <Icon size={15} style={{ color }} className="shrink-0 mt-0.5" />
+        </div>
+        <p className="text-[36px] font-bold text-white leading-none mb-2">{value}</p>
+        <div className="flex items-center gap-2">
+          {trend != null && (
+            <span
+              className={`flex items-center gap-0.5 text-[11px] font-semibold ${
+                trend >= 0 ? "text-green-500" : "text-red-400"
+              }`}
+            >
+              {trend >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+              {trend >= 0 ? "+" : ""}{trend}% vs prev 30d
+            </span>
+          )}
+          {sub && <span className="text-xs text-fg3">{sub}</span>}
+        </div>
       </div>
     </div>
   );

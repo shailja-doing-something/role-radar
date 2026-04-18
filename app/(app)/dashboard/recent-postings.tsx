@@ -60,7 +60,7 @@ export function RecentPostings() {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams({
-      limit: "10",
+      limit: "8",
       ...(top100Only ? { top100Only: "true" } : {}),
     });
     fetch(`/api/postings?${params}`)
@@ -80,7 +80,7 @@ export function RecentPostings() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
             Recent Postings
           </p>
-          <p className="text-xs text-fg3">Latest 10 from all sources</p>
+          <p className="text-xs text-fg3">Latest 8 from all sources</p>
         </div>
         <button
           type="button"
@@ -113,9 +113,7 @@ export function RecentPostings() {
       {!loading && postings.length === 0 && (
         <div className="py-10 text-center">
           <p className="text-fg3 text-sm">
-            {top100Only
-              ? "No target account postings yet"
-              : "No postings yet — run a scrape"}
+            {top100Only ? "No target account postings yet" : "No postings yet."}
           </p>
         </div>
       )}
