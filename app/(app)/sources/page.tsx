@@ -10,28 +10,40 @@ export default async function SourcesPage() {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <Database size={22} className="text-blue-400" />
-          Sources
-        </h1>
+    <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
+
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <Database size={20} className="text-indigo-400" />
+            <h1 className="text-2xl font-semibold text-white">Sources</h1>
+          </div>
+          <p className="text-sm text-fg2">Job boards configured for scraping</p>
+        </div>
         <AddSourceForm />
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      {/* Table */}
+      <div className="bg-surface border border-edge rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-800">
-              <th className="text-left text-gray-500 font-medium px-6 py-3">Board</th>
-              <th className="text-left text-gray-500 font-medium px-4 py-3">Status</th>
-              <th className="text-right text-gray-500 font-medium px-4 py-3">Total</th>
-              <th className="text-right text-gray-500 font-medium px-4 py-3">Last run</th>
-              <th className="text-left text-gray-500 font-medium px-4 py-3">Last scraped</th>
-              <th className="text-right text-gray-500 font-medium px-6 py-3">Actions</th>
+            <tr className="border-b border-edge">
+              {["Board", "Status", "Total", "Last run", "Last scraped", ""].map((h, i) => (
+                <th
+                  key={i}
+                  className={`px-5 py-3 ${i === 0 ? "text-left" : i >= 2 && i <= 3 ? "text-right" : i === 5 ? "" : "text-left"}`}
+                >
+                  {h && (
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3">
+                      {h}
+                    </span>
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-edge">
             {boards.map((board) => {
               const hasError  = !!board.lastError;
               const scraped   = board.lastScraped;
@@ -40,75 +52,80 @@ export default async function SourcesPage() {
               const isWarning = scraped && !hasError && lastCount === 0;
 
               return (
-                <tr key={board.id} className="border-b border-gray-800/50 last:border-0">
-                  <td className="px-6 py-4">
-                    <div className="flex items-start gap-2">
+                <tr key={board.id} className="hover:bg-surface-raised transition-colors">
+                  {/* Board */}
+                  <td className="px-5 py-4">
+                    <div className="flex items-start gap-2.5">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
-                          board.active ? "bg-green-400" : "bg-gray-600"
+                          board.active ? "bg-green-400" : "bg-fg3"
                         }`}
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-200 font-medium">{board.name}</span>
-                          <code className="text-gray-600 text-xs">{board.slug}</code>
+                          <span className="text-white font-medium">{board.name}</span>
+                          <code className="text-fg3 text-xs">{board.slug}</code>
                           <span
-                            className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
                               board.category === "niche"
-                                ? "bg-purple-900/40 text-purple-400"
-                                : "bg-gray-800 text-gray-500"
+                                ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                                : "bg-surface-raised border border-edge text-fg3"
                             }`}
                           >
                             {board.category}
                           </span>
                         </div>
                         {board.description && (
-                          <p className="text-gray-600 text-xs mt-0.5 max-w-xs">{board.description}</p>
+                          <p className="text-fg3 text-xs mt-0.5 max-w-xs">{board.description}</p>
                         )}
                       </div>
                     </div>
                   </td>
 
-                  <td className="px-4 py-4">
+                  {/* Status */}
+                  <td className="px-5 py-4">
                     {!board.active ? (
-                      <span className="text-xs text-gray-600">Disabled</span>
+                      <span className="text-xs text-fg3">Disabled</span>
                     ) : hasError ? (
-                      <span className="flex items-center gap-1 text-red-400 text-xs" title={board.lastError ?? ""}>
+                      <span className="flex items-center gap-1.5 text-red-400 text-xs" title={board.lastError ?? ""}>
                         <AlertCircle size={13} /> Error
                       </span>
                     ) : isWorking ? (
-                      <span className="flex items-center gap-1 text-green-400 text-xs">
+                      <span className="flex items-center gap-1.5 text-green-400 text-xs">
                         <CheckCircle size={13} /> OK
                       </span>
                     ) : isWarning ? (
-                      <span className="flex items-center gap-1 text-yellow-400 text-xs">
+                      <span className="flex items-center gap-1.5 text-amber-400 text-xs">
                         <AlertCircle size={13} /> 0 results
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-gray-500 text-xs">
+                      <span className="flex items-center gap-1.5 text-fg3 text-xs">
                         <Clock size={13} /> Pending
                       </span>
                     )}
                   </td>
 
-                  <td className="px-4 py-4 text-right">
-                    <span className="text-blue-400 font-semibold">
-                      {board._count.postings}
+                  {/* Total postings */}
+                  <td className="px-5 py-4 text-right">
+                    <span className="text-indigo-400 font-semibold tabular-nums">
+                      {board._count.postings.toLocaleString()}
                     </span>
                   </td>
 
-                  <td className="px-4 py-4 text-right">
+                  {/* Last run count */}
+                  <td className="px-5 py-4 text-right">
                     {lastCount !== null && lastCount !== undefined ? (
-                      <span className={`text-xs font-medium ${lastCount > 0 ? "text-green-400" : "text-gray-500"}`}>
+                      <span className={`text-xs font-semibold tabular-nums ${lastCount > 0 ? "text-green-400" : "text-fg3"}`}>
                         +{lastCount}
                       </span>
                     ) : (
-                      <span className="text-gray-600 text-xs">—</span>
+                      <span className="text-fg3 text-xs">—</span>
                     )}
                   </td>
 
-                  <td className="px-4 py-4">
-                    <span className="text-gray-500 text-xs">
+                  {/* Last scraped timestamp */}
+                  <td className="px-5 py-4">
+                    <span className="text-fg2 text-xs">
                       {scraped
                         ? new Date(scraped).toLocaleString("en-US", {
                             month: "short", day: "numeric",
@@ -117,13 +134,14 @@ export default async function SourcesPage() {
                         : "Never"}
                     </span>
                     {hasError && (
-                      <p className="text-red-500 text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
+                      <p className="text-red-400 text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
                         {board.lastError}
                       </p>
                     )}
                   </td>
 
-                  <td className="px-6 py-4">
+                  {/* Actions */}
+                  <td className="px-5 py-4">
                     <SourceControls id={board.id} slug={board.slug} active={board.active} />
                   </td>
                 </tr>

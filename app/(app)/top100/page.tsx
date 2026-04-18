@@ -3,17 +3,36 @@ import { Trophy } from "lucide-react";
 import { Top100Client } from "./top100-client";
 
 export default async function Top100Page() {
-  const teams = await prisma.top100Team.findMany({
-    orderBy: { id: "asc" },
-  });
+  const [teamsRaw, postingCounts] = await Promise.all([
+    prisma.top100Team.findMany({
+      orderBy: { id: "asc" },
+      select: { id: true, name: true, brokerage: true, location: true, website: true, isMatched: true, createdAt: true },
+    }),
+    prisma.jobPosting.groupBy({
+      by: ["company"],
+      where: { isTop100: true, isActive: true },
+      _count: { company: true },
+    }),
+  ]);
+
+  const countMap = new Map(postingCounts.map((p) => [p.company.toLowerCase(), p._count.company]));
+  const teams = teamsRaw.map((t) => ({
+    ...t,
+    createdAt: t.createdAt.toISOString(),
+    roleCount: countMap.get(t.name.toLowerCase()) ?? 0,
+  }));
 
   return (
-    <div className="p-8">
-      <h1 className="flex items-center gap-2 text-2xl font-bold text-white mb-2">
-        <Trophy size={22} className="text-blue-400" />
-        Top 100 Teams
-      </h1>
-
+    <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <Trophy size={20} className="text-indigo-400" />
+            <h1 className="text-2xl font-semibold text-white">Top 100 Teams</h1>
+          </div>
+          <p className="text-sm text-fg2">Target accounts tracked for ISA &amp; ops hiring signals</p>
+        </div>
+      </div>
       <Top100Client teams={teams} />
     </div>
   );

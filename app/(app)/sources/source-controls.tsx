@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw, Power, PowerOff } from "lucide-react";
+import { RefreshCw, Power, PowerOff, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Props {
-  id: number;
-  slug: string;
+  id:     number;
+  slug:   string;
   active: boolean;
 }
 
@@ -48,31 +48,34 @@ export function SourceControls({ id, slug, active }: Props) {
       {active ? (
         <>
           <button
+            type="button"
             onClick={handleScrape}
             disabled={scraping}
-            title="Scrape now"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg2 hover:text-white hover:bg-surface-raised disabled:opacity-30 transition-colors"
           >
-            <RefreshCw size={13} className={scraping ? "animate-spin" : ""} />
+            {scraping
+              ? <Loader2  size={12} className="animate-spin" />
+              : <RefreshCw size={12} />}
             {scraping ? "Scraping…" : "Scrape"}
           </button>
           <button
+            type="button"
             onClick={handleToggle}
             disabled={toggling}
-            title="Disable source"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-gray-800 disabled:opacity-30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg3 hover:text-red-400 hover:bg-surface-raised disabled:opacity-30 transition-colors"
           >
-            <PowerOff size={13} />
-            Disable
+            <PowerOff size={12} />
+            {toggling ? "Disabling…" : "Disable"}
           </button>
         </>
       ) : (
         <button
+          type="button"
           onClick={handleToggle}
           disabled={toggling}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-30 transition-colors border border-blue-800 hover:border-blue-600"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white disabled:opacity-30 transition-colors border border-indigo-500/30"
         >
-          <Power size={13} />
+          <Power size={12} />
           {toggling ? "Enabling…" : "Enable"}
         </button>
       )}
