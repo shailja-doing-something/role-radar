@@ -10,13 +10,20 @@ export default async function PatternsPage() {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <TrendingUp size={22} className="text-blue-400" />
-          Hiring Intelligence
-        </h1>
-        <AnalyzeButton />
+    <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
+
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <TrendingUp size={20} className="text-indigo-400" />
+            <h1 className="text-2xl font-semibold text-white">Patterns</h1>
+          </div>
+          <p className="text-sm text-fg2">
+            Gemini-powered hiring intelligence from your scraped data
+          </p>
+        </div>
+        <AnalyzeButton lastAnalyzed={latest?.createdAt.toISOString() ?? null} />
       </div>
 
       {latest ? (
@@ -25,10 +32,10 @@ export default async function PatternsPage() {
           createdAt={latest.createdAt.toISOString()}
         />
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-          <TrendingUp size={32} className="text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">
-            No analysis yet. Run a scrape or click &ldquo;Refresh Analysis&rdquo; to generate insights.
+        <div className="bg-surface border border-edge rounded-xl p-12 text-center">
+          <TrendingUp size={32} className="text-fg3 mx-auto mb-3" />
+          <p className="text-fg2 text-sm">
+            No analysis yet — run a scrape first, then click &ldquo;Refresh Analysis&rdquo;.
           </p>
         </div>
       )}
