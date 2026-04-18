@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Database, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Database, AlertCircle, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { SourceControls } from "./source-controls";
 import { AddSourceForm } from "./add-source-form";
 
@@ -63,8 +63,23 @@ export default async function SourcesPage() {
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">{board.name}</span>
+                          <a
+                            href={board.baseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white font-medium hover:text-indigo-300 transition-colors"
+                          >
+                            {board.name}
+                          </a>
                           <code className="text-fg3 text-xs">{board.slug}</code>
+                          <a
+                            href={board.baseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-fg3 hover:text-indigo-400 transition-colors shrink-0"
+                          >
+                            <ExternalLink size={11} />
+                          </a>
                           <span
                             className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
                               board.category === "niche"
