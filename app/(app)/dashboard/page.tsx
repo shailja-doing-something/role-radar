@@ -1,44 +1,75 @@
 import { prisma } from "@/lib/prisma";
-import { LayoutDashboard } from "lucide-react";
-import { DashboardCharts } from "./charts";
+import { LayoutDashboard, Star, ArrowUp, ArrowDown } from "lucide-react";
+import Link from "next/link";
+import { VolumeChart, RolesChart } from "./charts";
 import { ScrapeButton } from "./scrape-button";
 import { RecentPostings } from "./recent-postings";
 
 export default async function DashboardPage() {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now          = Date.now();
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo  = new Date(now - 60 * 24 * 60 * 60 * 1000);
 
   const [
-    total,
-    recentByPostedAt,
-    activeSources,
-    topCompanies,
-    remoteCount,
+    activePostings30,
+    activePostingsPrior,
+    targetPostings,
+    isaCount,
     dailyRaw,
-    topPatterns,
+    topRoles,
+    targetTeamActivity,
+    lastScrapedRow,
   ] = await Promise.all([
-    prisma.jobPosting.count(),
-    prisma.jobPosting.count({ where: { postedAt: { gte: sevenDaysAgo } } }),
-    prisma.jobBoard.count({ where: { active: true } }),
-    prisma.jobPosting.groupBy({
-      by: ["company"],
-      _count: { company: true },
-      orderBy: { _count: { company: "desc" } },
-      take: 8,
+    prisma.jobPosting.count({
+      where: { isActive: true, createdAt: { gte: thirtyDaysAgo } },
     }),
-    prisma.jobPosting.count({ where: { remote: true } }),
+    prisma.jobPosting.count({
+      where: { isActive: true, createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    }),
+    prisma.jobPosting.count({ where: { isTop100: true, isActive: true } }),
+    prisma.jobPosting.count({
+      where: {
+        isActive: true,
+        OR: [
+          { title: { contains: "Inside Sales", mode: "insensitive" } },
+          { title: { startsWith: "ISA",        mode: "insensitive" } },
+        ],
+      },
+    }),
     prisma.jobPosting.findMany({
-      where: { createdAt: { gte: thirtyDaysAgo } },
+      where:  { createdAt: { gte: thirtyDaysAgo } },
       select: { createdAt: true },
     }),
-    prisma.pattern.findMany({
-      orderBy: { count: "desc" },
-      take: 8,
-      select: { keyword: true, count: true, category: true },
+    prisma.jobPosting.groupBy({
+      by:      ["title"],
+      where:   { isActive: true },
+      _count:  { title: true },
+      orderBy: { _count: { title: "desc" } },
+      take:    6,
+    }),
+    prisma.jobPosting.groupBy({
+      by:      ["company"],
+      where:   { isTop100: true, isActive: true },
+      _count:  { company: true },
+      _max:    { createdAt: true },
+      orderBy: { _count: { company: "desc" } },
+      take:    8,
+    }),
+    prisma.jobBoard.findFirst({
+      where:   { lastScraped: { not: null } },
+      orderBy: { lastScraped: "desc" },
+      select:  { lastScraped: true },
     }),
   ]);
 
-  // Aggregate daily counts
+  const activelyHiringTeams = targetTeamActivity.length;
+
+  const trendPct =
+    activePostingsPrior > 0
+      ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)
+      : null;
+
+  // Volume chart
   const dailyCounts: Record<string, number> = {};
   for (const p of dailyRaw) {
     const day = p.createdAt.toISOString().slice(0, 10);
@@ -46,62 +77,119 @@ export default async function DashboardPage() {
   }
   const volumeData = Object.entries(dailyCounts)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date: date.slice(5), count })); // "04-13" not "2026-04-13"
+    .map(([date, count]) => ({ date: date.slice(5), count }));
 
-  const remoteRatio = [
-    { name: "Remote", value: remoteCount, fill: "#3b82f6" },
-    { name: "On-site", value: total - remoteCount, fill: "#1e3a5f" },
-  ];
+  // Roles chart
+  const roleTotal = topRoles.reduce((s, r) => s + r._count.title, 0);
+  const rolesData = topRoles.map((r) => ({
+    role:  r.title.length > 28 ? r.title.slice(0, 28) + "…" : r.title,
+    count: r._count.title,
+    pct:   roleTotal > 0 ? Math.round((r._count.title / roleTotal) * 100) : 0,
+  }));
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <LayoutDashboard size={22} className="text-blue-400" />
-          Dashboard
-        </h1>
-        <ScrapeButton />
+    <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
+
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <LayoutDashboard size={20} className="text-indigo-400" />
+            <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
+          </div>
+          <p className="text-sm text-fg2">Real estate hiring intelligence — live view</p>
+        </div>
+        <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Postings" value={total.toLocaleString()} />
-        <StatCard label="New This Week" value={recentByPostedAt.toLocaleString()} sub="by post date" />
-        <StatCard label="Active Sources" value={activeSources.toLocaleString()} />
-        <StatCard label="Remote Roles" value={`${total ? Math.round((remoteCount / total) * 100) : 0}%`} sub={`${remoteCount} of ${total}`} />
+      {/* ── Stat cards ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <StatCard
+          label="Active Postings"
+          value={activePostings30.toLocaleString()}
+          sub="last 30 days"
+          trend={trendPct}
+        />
+        <StatCard
+          label="Target Account Postings"
+          value={targetPostings.toLocaleString()}
+          sub="Top 100 active roles"
+          accent
+        />
+        <StatCard
+          label="Actively Hiring Teams"
+          value={activelyHiringTeams.toLocaleString()}
+          sub="Top 100 with live postings"
+        />
+        <StatCard
+          label="ISA Roles Open"
+          value={isaCount.toLocaleString()}
+          sub="Inside Sales roles"
+        />
       </div>
 
-      {/* Charts */}
-      <DashboardCharts
-        volumeData={volumeData}
-        remoteRatio={remoteRatio}
-        topPatterns={topPatterns}
-      />
+      {/* ── Charts row (60 / 40) ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-6 mb-8">
+        <div className="col-span-3 bg-surface border border-edge rounded-xl p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
+            Hiring Activity
+          </p>
+          <p className="text-xs text-fg3 mb-5">Posting volume — last 30 days</p>
+          <VolumeChart data={volumeData} />
+        </div>
+        <div className="col-span-2 bg-surface border border-edge rounded-xl p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
+            Top Roles Being Hired
+          </p>
+          <p className="text-xs text-fg3 mb-5">Top 6 by active posting count</p>
+          <RolesChart data={rolesData} />
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* Top Companies */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-4">Top Companies (scraped postings)</h2>
-          {topCompanies.length === 0 ? (
-            <p className="text-gray-500 text-sm">No data yet — scrape from Sources.</p>
+      {/* ── Bottom row (50 / 50) ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-6">
+
+        {/* Target Account Activity */}
+        <div className="bg-surface border border-edge rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
+                Target Account Activity
+              </p>
+              <p className="text-xs text-fg3">Top 100 teams with live postings</p>
+            </div>
+            <Link
+              href="/signals"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              See all →
+            </Link>
+          </div>
+
+          {targetTeamActivity.length === 0 ? (
+            <p className="text-fg3 text-sm py-8 text-center">
+              No target account postings yet — run a scrape.
+            </p>
           ) : (
-            <div className="space-y-2">
-              {topCompanies.map((c, i) => (
-                <div key={c.company} className="flex items-center gap-3">
-                  <span className="text-gray-600 text-xs w-4 text-right">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-gray-300 text-sm truncate">{c.company}</span>
-                      <span className="text-blue-400 text-xs font-medium ml-2 shrink-0">
-                        {c._count.company}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-600 rounded-full"
-                        style={{ width: `${(c._count.company / topCompanies[0]._count.company) * 100}%` }}
-                      />
-                    </div>
+            <div className="divide-y divide-edge">
+              {targetTeamActivity.map((t) => (
+                <div
+                  key={t.company}
+                  className="flex items-center justify-between py-3 gap-3"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Star size={11} className="text-amber-400 shrink-0" />
+                    <span className="text-sm text-white font-medium truncate">
+                      {t.company}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-xs text-fg2">
+                      {t._count.company} role{t._count.company !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-xs text-fg3">
+                      {timeAgo(t._max.createdAt?.toISOString() ?? null)}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -109,19 +197,63 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Recent Postings — client component with Target Accounts toggle */}
+        {/* Recent Postings */}
         <RecentPostings />
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7)  return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, trend, accent,
+}: {
+  label:   string;
+  value:   string;
+  sub?:    string;
+  trend?:  number | null;
+  accent?: boolean;
+}) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-white text-3xl font-bold">{value}</p>
-      {sub && <p className="text-gray-500 text-xs mt-1">{sub}</p>}
+    <div
+      className={`rounded-xl p-6 border ${
+        accent
+          ? "bg-indigo-500/5 border-indigo-500/30"
+          : "bg-surface border-edge"
+      }`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-3">
+        {label}
+      </p>
+      <p className="text-[32px] font-bold text-white leading-none mb-2">{value}</p>
+      <div className="flex items-center gap-2">
+        {trend != null && (
+          <span
+            className={`flex items-center gap-0.5 text-[11px] font-semibold ${
+              trend >= 0 ? "text-green-500" : "text-red-400"
+            }`}
+          >
+            {trend >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+            {trend >= 0 ? "+" : ""}
+            {trend}% vs prev 30d
+          </span>
+        )}
+        {sub && <span className="text-xs text-fg3">{sub}</span>}
+      </div>
     </div>
   );
 }

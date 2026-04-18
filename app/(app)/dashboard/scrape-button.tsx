@@ -5,11 +5,22 @@ import { Play, Loader2, CheckCircle, XCircle } from "lucide-react";
 
 type Status = "idle" | "running" | "success" | "error";
 
-export function ScrapeButton() {
+function formatLastScraped(iso: string | null | undefined): string {
+  if (!iso) return "Never scraped";
+  const diff  = Date.now() - new Date(iso).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins  < 60)  return `Last scraped ${mins}m ago`;
+  if (hours < 24)  return `Last scraped ${hours}h ago`;
+  return `Last scraped ${days}d ago`;
+}
+
+export function ScrapeButton({ lastScraped }: { lastScraped?: string | null }) {
   const [status,  setStatus]  = useState<Status>("idle");
   const [message, setMessage] = useState("");
-  const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const resetRef  = useRef<ReturnType<typeof setTimeout>  | null>(null);
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resetRef = useRef<ReturnType<typeof setTimeout>  | null>(null);
 
   const clearReset = () => {
     if (resetRef.current) { clearTimeout(resetRef.current); resetRef.current = null; }
@@ -34,22 +45,17 @@ export function ScrapeButton() {
           stopPolling();
           setStatus("success");
           setMessage("Scrape complete");
-          scheduleReset(5000);
+          scheduleReset(6000);
         }
-      } catch {
-        // transient network error — keep polling
-      }
+      } catch { /* transient error — keep polling */ }
     }, 3000);
   }, [stopPolling, scheduleReset]);
 
-  // On mount: if a scrape is already in progress (e.g. triggered by scheduler),
-  // reflect that immediately so the button shows the right state.
   useEffect(() => {
     fetch("/api/scrape/status")
       .then((r) => r.json() as Promise<{ running: boolean }>)
       .then(({ running }) => { if (running) { setStatus("running"); startPolling(); } })
       .catch(() => {});
-
     return () => { stopPolling(); clearReset(); };
   }, [startPolling, stopPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -69,10 +75,9 @@ export function ScrapeButton() {
 
       if (!res.ok) {
         setStatus("error");
-        setMessage(data.error ?? "Scrape trigger failed");
+        setMessage(data.error ?? "Trigger failed");
         scheduleReset(6000);
       } else {
-        // Poll until the scraper finishes (may take several minutes)
         startPolling();
       }
     } catch {
@@ -83,34 +88,36 @@ export function ScrapeButton() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={status === "running"}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-      >
-        {status === "running"
-          ? <Loader2 size={15} className="animate-spin" />
-          : <Play    size={15} />}
-        {status === "running" ? "Scraping…" : "Run Scrape Now"}
-      </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={status === "running"}
+          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
+          {status === "running"
+            ? <Loader2 size={14} className="animate-spin" />
+            : <Play    size={14} />}
+          {status === "running" ? "Scraping…" : "Run Scrape Now"}
+        </button>
 
-      {status === "running" && (
-        <span className="text-gray-400 text-sm animate-pulse">
-          Running — may take a few minutes
-        </span>
-      )}
-      {status === "success" && (
-        <span className="flex items-center gap-1.5 text-green-400 text-sm">
-          <CheckCircle size={14} /> {message}
-        </span>
-      )}
-      {status === "error" && (
-        <span className="flex items-center gap-1.5 text-red-400 text-sm">
-          <XCircle size={14} /> {message}
-        </span>
-      )}
+        {status === "running" && (
+          <span className="text-fg2 text-sm animate-pulse">Running — may take a few minutes</span>
+        )}
+        {status === "success" && (
+          <span className="flex items-center gap-1.5 text-green-400 text-sm">
+            <CheckCircle size={14} /> {message}
+          </span>
+        )}
+        {status === "error" && (
+          <span className="flex items-center gap-1.5 text-red-400 text-sm">
+            <XCircle size={14} /> {message}
+          </span>
+        )}
+      </div>
+
+      <span className="text-xs text-fg3">{formatLastScraped(lastScraped)}</span>
     </div>
   );
 }

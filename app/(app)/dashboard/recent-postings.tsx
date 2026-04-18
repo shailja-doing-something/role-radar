@@ -1,18 +1,55 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Target, ExternalLink, MapPin, DollarSign } from "lucide-react";
+import { Target, ExternalLink, MapPin } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Posting {
-  id:       number;
-  title:    string;
-  company:  string;
-  location: string | null;
-  remote:   boolean;
-  salary:   string | null;
-  url:      string;
-  postedAt: string | null;
-  isTop100: boolean;
+  id:        number;
+  title:     string;
+  company:   string;
+  location:  string | null;
+  remote:    boolean;
+  salary:    string | null;
+  url:       string;
+  source:    string;
+  postedAt:  string | null;
+  createdAt: string;
+  isTop100:  boolean;
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  linkedin:         "LinkedIn",
+  indeed:           "Indeed",
+  ziprecruiter:     "ZipRecruiter",
+  glassdoor:        "Glassdoor",
+  website:          "Web",
+  brokerage_portal: "Portal",
+};
+
+function roleClasses(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("inside sales") || /\bisa\b/.test(t))
+    return "bg-indigo-500/15 text-indigo-400";
+  if (t.includes("marketing"))
+    return "bg-purple-500/15 text-purple-400";
+  if (t.includes("operations") || t.includes("admin") || t.includes("manager"))
+    return "bg-blue-500/15 text-blue-400";
+  if (t.includes("transaction") || t.includes("coordinator") || t.includes("listing"))
+    return "bg-green-500/15 text-green-400";
+  return "bg-surface-raised text-fg2";
+}
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const diff  = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (hours < 1)  return "Just now";
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7)   return `${days}d ago`;
+  if (days < 30)  return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 }
 
 export function RecentPostings() {
@@ -36,75 +73,98 @@ export function RecentPostings() {
   }, [top100Only]);
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+    <div className="bg-surface border border-edge rounded-xl p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-white font-semibold">Recent Postings</h2>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
+            Recent Postings
+          </p>
+          <p className="text-xs text-fg3">Latest 10 from all sources</p>
+        </div>
         <button
           type="button"
           onClick={() => setTop100Only((v) => !v)}
-          className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+          className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
             top100Only
-              ? "bg-amber-950/40 border-amber-700/50 text-amber-400"
-              : "bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-300"
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              : "border-edge text-fg3 hover:bg-surface-raised hover:text-fg2"
           }`}
         >
           <Target size={11} />
-          Target Accounts Only
+          Target Only
         </button>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      {/* Skeleton */}
+      {loading && (
+        <div className="space-y-3 pt-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-5 w-28 rounded-full shrink-0" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-3 w-10 shrink-0" />
+            </div>
+          ))}
         </div>
-      ) : postings.length === 0 ? (
-        <p className="text-gray-500 text-sm">
-          {top100Only ? "No target account postings yet — run a scrape." : "No data yet — scrape from Sources."}
-        </p>
-      ) : (
-        <div className="space-y-3">
+      )}
+
+      {/* Empty */}
+      {!loading && postings.length === 0 && (
+        <div className="py-10 text-center">
+          <p className="text-fg3 text-sm">
+            {top100Only
+              ? "No target account postings yet"
+              : "No postings yet — run a scrape"}
+          </p>
+        </div>
+      )}
+
+      {/* List */}
+      {!loading && postings.length > 0 && (
+        <div className="divide-y divide-edge -mx-6">
           {postings.map((p) => (
             <a
               key={p.id}
               href={p.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block"
+              className="group flex items-center gap-3 py-2.5 px-6 hover:bg-surface-raised transition-colors"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-gray-300 text-sm truncate group-hover:text-white transition-colors">
-                    {p.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-gray-500 text-xs">{p.company}</span>
-                    {p.isTop100 && (
-                      <span title="Top 100 target account">
-                        <Target size={10} className="text-amber-400 shrink-0" />
-                      </span>
-                    )}
-                    {p.remote && (
-                      <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                        Remote
-                      </span>
-                    )}
-                    {p.location && !p.remote && (
-                      <span className="flex items-center gap-0.5 text-gray-500 text-xs">
-                        <MapPin size={10} />{p.location}
-                      </span>
-                    )}
-                    {p.salary && (
-                      <span className="flex items-center gap-0.5 text-green-400 text-xs">
-                        <DollarSign size={10} />{p.salary.slice(0, 20)}
-                      </span>
-                    )}
-                  </div>
+              {/* Role badge */}
+              <span
+                className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleClasses(p.title)}`}
+              >
+                {p.title.length > 20 ? p.title.slice(0, 20) + "…" : p.title}
+              </span>
+
+              {/* Company + meta */}
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-white font-medium truncate block group-hover:text-indigo-300 transition-colors">
+                  {p.company}
+                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {p.location && (
+                    <span className="flex items-center gap-0.5 text-[11px] text-fg3">
+                      <MapPin size={9} />
+                      {p.location.length > 18 ? p.location.slice(0, 18) + "…" : p.location}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-fg3">
+                    {SOURCE_LABEL[p.source] ?? p.source}
+                  </span>
                 </div>
+              </div>
+
+              {/* Right meta */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {p.isTop100 && <Target size={10} className="text-amber-400" />}
+                <span className="text-[11px] text-fg3">
+                  {timeAgo(p.postedAt ?? p.createdAt)}
+                </span>
                 <ExternalLink
-                  size={13}
-                  className="text-gray-600 shrink-0 mt-0.5 group-hover:text-gray-400 transition-colors"
+                  size={11}
+                  className="text-fg3 group-hover:text-fg2 transition-colors"
                 />
               </div>
             </a>
