@@ -178,12 +178,12 @@ function TeamCard({
   );
 }
 
-const FIELD_DEFS = [
+const FIELD_DEFS: { label: string; key: "name" | "brokerage" | "location" | "website"; placeholder: string; required?: boolean }[] = [
   { label: "Team Name *",  key: "name",      placeholder: "e.g. The Smith Group", required: true },
   { label: "Brokerage",   key: "brokerage",  placeholder: "e.g. Keller Williams" },
   { label: "Location",    key: "location",   placeholder: "e.g. Austin, TX" },
   { label: "Website",     key: "website",    placeholder: "https://example.com" },
-] as const;
+];
 
 export function Top100Client({ teams: initial }: { teams: Team[] }) {
   const [teams,      setTeams]      = useState(initial);
