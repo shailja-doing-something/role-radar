@@ -10,8 +10,11 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fire-and-forget — scrapeAll can take several minutes
-  scrapeAll().catch((e) => console.error("[Trigger] scrapeAll failed:", e));
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const skipJSearch = body.skipJSearch === true;
 
-  return Response.json({ ok: true, message: "Scrape started" });
+  // Fire-and-forget — scrapeAll can take several minutes
+  scrapeAll(skipJSearch).catch((e) => console.error("[Trigger] scrapeAll failed:", e));
+
+  return Response.json({ ok: true, message: "Scrape started", skipJSearch });
 }

@@ -2,8 +2,8 @@ import { GoogleGenerativeAI, type Tool } from "@google/generative-ai";
 
 const PRIMARY_MODEL = "gemini-2.5-flash";
 const FALLBACK_MODEL = "gemini-2.5-flash-lite";
-// Gemini 1.5 Flash for Google Search grounding (stable across SDK versions)
-const SEARCH_MODEL = "gemini-1.5-flash-latest";
+// Gemini 1.5 Flash for Google Search grounding (googleSearchRetrieval tool)
+const SEARCH_MODEL = "gemini-1.5-flash";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 

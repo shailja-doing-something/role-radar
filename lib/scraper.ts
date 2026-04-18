@@ -563,20 +563,21 @@ async function layer5ReMatch(): Promise<number> {
 // _scrapeAll — full 4-layer orchestrator
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function _scrapeAll(): Promise<void> {
+async function _scrapeAll(skipJSearch = false): Promise<void> {
   const apiKey = process.env.JSEARCH_API_KEY;
-  if (!apiKey || apiKey === "your_rapidapi_key_here") {
+  if (!skipJSearch && (!apiKey || apiKey === "your_rapidapi_key_here")) {
     console.error("[Scraper] JSEARCH_API_KEY is not set — aborting");
     return;
   }
 
   totalJSearchCalls = 0;
   totalGeminiCalls  = 0;
-  console.log("[Scraper] scrapeAll starting — 4-layer strategy");
+  const mode = skipJSearch ? "L3+L4 only (Gemini web search)" : "4-layer strategy";
+  console.log(`[Scraper] scrapeAll starting — ${mode}`);
 
   // ── Layers 1–4: collect ───────────────────────────────────────────────────
-  const l1 = await layer1NamedTeamSearch();
-  const l2 = await layer2ISASearch();
+  const l1 = skipJSearch ? [] : await layer1NamedTeamSearch();
+  const l2 = skipJSearch ? [] : await layer2ISASearch();
   const l3 = await layer3WebsiteSearch();
   const l4 = await layer4BrokerageSearch();
 
@@ -673,13 +674,13 @@ let scraperRunning = false;
 
 export function isScraperRunning(): boolean { return scraperRunning; }
 
-export async function scrapeAll(): Promise<void> {
+export async function scrapeAll(skipJSearch = false): Promise<void> {
   if (scraperRunning) {
     console.log("[Scraper] already in progress — skipping concurrent call");
     return;
   }
   scraperRunning = true;
-  try { await _scrapeAll(); } finally { scraperRunning = false; }
+  try { await _scrapeAll(skipJSearch); } finally { scraperRunning = false; }
 }
 
 // scrapeBoard: lightweight per-board scrape for the Sources page
