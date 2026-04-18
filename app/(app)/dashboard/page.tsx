@@ -5,9 +5,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ElementType } from "react";
-import { VolumeChart, RolesChart } from "./charts";
+import { RolesChart } from "./charts";
 import { ScrapeButton } from "./scrape-button";
 import { RecentPostings } from "./recent-postings";
+
+const SOURCE_LABELS: Record<string, string> = {
+  linkedin:         "LinkedIn",
+  indeed:           "Indeed",
+  ziprecruiter:     "ZipRecruiter",
+  glassdoor:        "Glassdoor",
+  website:          "Web",
+  brokerage_portal: "Portal",
+};
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -19,7 +28,7 @@ export default async function DashboardPage() {
     activePostingsPrior,
     targetPostings,
     isaCount,
-    dailyRaw,
+    isaAllPostings,
     topRoles,
     totalActive,
     targetTeamActivity,
@@ -42,8 +51,17 @@ export default async function DashboardPage() {
       },
     }),
     prisma.jobPosting.findMany({
-      where:  { createdAt: { gte: thirtyDaysAgo } },
-      select: { createdAt: true },
+      where: {
+        isActive: true,
+        OR: [
+          { title: { contains: "Inside Sales", mode: "insensitive" } },
+          { title: { startsWith: "ISA",        mode: "insensitive" } },
+          { title: { contains: "Lead Manager", mode: "insensitive" } },
+          { title: { contains: "Team Lead",    mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, title: true, company: true, location: true, url: true, source: true, postedAt: true, createdAt: true, isTop100: true },
+      orderBy: { createdAt: "desc" },
     }),
     prisma.jobPosting.groupBy({
       by:      ["title"],
@@ -98,15 +116,25 @@ export default async function DashboardPage() {
       ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)
       : null;
 
-  // Volume chart
-  const dailyCounts: Record<string, number> = {};
-  for (const p of dailyRaw) {
-    const day = p.createdAt.toISOString().slice(0, 10);
-    dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
+  // ISA Signal Tracker
+  const isaTargetCount   = isaAllPostings.filter((p) => p.isTop100).length;
+  const targetIsaPostings = isaAllPostings.filter((p) => p.isTop100).slice(0, 6);
+  const isaDays = isaAllPostings.map((p) => {
+    const d = p.postedAt ?? p.createdAt;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  });
+  const avgDaysPosted = isaDays.length > 0
+    ? Math.round(isaDays.reduce((a, b) => a + b, 0) / isaDays.length)
+    : 0;
+  const stateCounts: Record<string, number> = {};
+  for (const p of isaAllPostings) {
+    if (!p.location) continue;
+    const m = p.location.match(/,\s*([A-Z]{2})(?:\s|$)/);
+    if (m) stateCounts[m[1]] = (stateCounts[m[1]] ?? 0) + 1;
   }
-  const volumeData = Object.entries(dailyCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date: date.slice(5), count }));
+  const topIsaStates = Object.entries(stateCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4);
 
   // Roles chart
   const rolesData = topRoles.map((r) => ({
@@ -166,12 +194,87 @@ export default async function DashboardPage() {
 
       {/* ── Charts row (60 / 40) ────────────────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-6 mb-6 items-start">
-        <div className="col-span-3 bg-surface border border-edge rounded-xl p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
-            Hiring Activity
-          </p>
-          <p className="text-xs text-fg3 mb-5">Posting volume — last 30 days</p>
-          <VolumeChart data={volumeData} />
+        <div className="col-span-3 bg-surface border border-edge rounded-xl overflow-hidden">
+          <div style={{ height: 3, background: "#F59E0B" }} />
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-0.5">
+                  ISA Signal Tracker
+                </p>
+                <p className="text-xs text-fg3">Inside Sales hiring across your target accounts</p>
+              </div>
+              <Phone size={15} className="text-amber-400 shrink-0" />
+            </div>
+
+            {/* Section 1 — mini stats */}
+            <div className="flex rounded-lg border border-edge divide-x divide-edge mb-5">
+              <div className="flex-1 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">ISA Roles Active</p>
+                <p className="text-2xl font-bold text-white">{isaAllPostings.length}</p>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">From Target Accounts</p>
+                <p className="text-2xl font-bold text-white">{isaTargetCount}</p>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg3 mb-1">Avg Days Posted</p>
+                <p className="text-2xl font-bold text-white">{avgDaysPosted > 0 ? avgDaysPosted : "—"}</p>
+              </div>
+            </div>
+
+            {/* Section 2 — target accounts hiring ISA */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-2">
+                Target Accounts Hiring ISA Now
+              </p>
+              {targetIsaPostings.length === 0 ? (
+                <div className="flex items-center gap-2 py-5 text-fg3">
+                  <Phone size={14} />
+                  <span className="text-sm">No target accounts hiring ISA right now</span>
+                </div>
+              ) : (
+                <div className="divide-y divide-edge -mx-6">
+                  {targetIsaPostings.map((p) => (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-6 py-2.5 hover:bg-surface-raised transition-colors"
+                    >
+                      <span className="flex-1 min-w-0 text-[13px] font-semibold text-white truncate">{p.company}</span>
+                      <span className="text-xs text-fg2 shrink-0 max-w-[140px] truncate">{p.title}</span>
+                      <span className="text-[11px] text-fg3 shrink-0">{SOURCE_LABELS[p.source] ?? p.source}</span>
+                      <span className="text-[11px] text-fg3 shrink-0">
+                        {timeAgo(p.postedAt?.toISOString() ?? p.createdAt.toISOString())}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section 3 — top states */}
+            {topIsaStates.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-edge">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-2">
+                  Top States for ISA Hiring
+                </p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {topIsaStates.map(([state, count]) => (
+                    <span
+                      key={state}
+                      className="text-[10px] px-2 py-1 bg-surface-raised border border-edge rounded text-fg2"
+                    >
+                      {state} {count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="col-span-2 bg-surface border border-edge rounded-xl p-6">
           <div className="flex items-center justify-between mb-0.5">
