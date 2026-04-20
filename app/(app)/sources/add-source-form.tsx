@@ -62,7 +62,7 @@ export function AddSourceForm() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium rounded-lg transition-colors"
+        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors"
       >
         <Plus size={14} /> Add Source
       </button>
@@ -82,11 +82,11 @@ export function AddSourceForm() {
         }`}
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-edge">
-          <h2 className="text-white font-semibold">Add Source</h2>
+          <h2 className="text-ink font-semibold">Add Source</h2>
           <button
             type="button"
             onClick={reset}
-            className="text-fg3 hover:text-white transition-colors"
+            className="text-fg3 hover:text-ink transition-colors"
           >
             <X size={18} />
           </button>
@@ -99,7 +99,7 @@ export function AddSourceForm() {
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g. Stack Overflow Jobs"
-              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-white text-sm placeholder-fg3 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-ink text-sm placeholder-fg3 focus:outline-none focus:border-primary transition-colors"
               required
             />
           </div>
@@ -110,7 +110,7 @@ export function AddSourceForm() {
               value={slug}
               onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
               placeholder="e.g. stackoverflow"
-              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-white text-sm placeholder-fg3 font-mono focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-ink text-sm placeholder-fg3 font-mono focus:outline-none focus:border-primary transition-colors"
               required
             />
           </div>
@@ -126,7 +126,7 @@ export function AddSourceForm() {
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://jobs.example.com/api/jobs"
               type="url"
-              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-white text-sm placeholder-fg3 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-ink text-sm placeholder-fg3 focus:outline-none focus:border-primary transition-colors"
               required
             />
             <p className="text-fg3 text-xs mt-1.5 leading-relaxed">
@@ -134,20 +134,20 @@ export function AddSourceForm() {
             </p>
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
 
           <div className="mt-auto flex gap-3 pt-2">
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="flex-1 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               {saving ? "Adding…" : "Add Source"}
             </button>
             <button
               type="button"
               onClick={reset}
-              className="px-4 py-2 text-sm text-fg2 hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-fg2 hover:text-ink transition-colors"
             >
               Cancel
             </button>

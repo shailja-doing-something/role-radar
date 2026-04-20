@@ -16,8 +16,8 @@ export default async function SourcesPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <Database size={20} className="text-indigo-400" />
-            <h1 className="text-2xl font-semibold text-white">Sources</h1>
+            <Database size={20} className="text-primary" />
+            <h1 className="text-2xl font-semibold text-ink">Sources</h1>
           </div>
           <p className="text-sm text-fg2">Job boards configured for scraping</p>
         </div>
@@ -58,7 +58,7 @@ export default async function SourcesPage() {
                     <div className="flex items-start gap-2.5">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
-                          board.active ? "bg-green-400" : "bg-fg3"
+                          board.active ? "bg-green-500" : "bg-fg3"
                         }`}
                       />
                       <div>
@@ -67,7 +67,7 @@ export default async function SourcesPage() {
                             href={board.baseUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-white font-medium hover:text-indigo-300 transition-colors"
+                            className="text-ink font-medium hover:text-primary transition-colors"
                           >
                             {board.name}
                           </a>
@@ -76,14 +76,14 @@ export default async function SourcesPage() {
                             href={board.baseUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-fg3 hover:text-indigo-400 transition-colors shrink-0"
+                            className="text-fg3 hover:text-primary transition-colors shrink-0"
                           >
                             <ExternalLink size={11} />
                           </a>
                           <span
                             className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
                               board.category === "niche"
-                                ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                                ? "bg-purple-50 text-purple-700 border border-purple-200"
                                 : "bg-surface-raised border border-edge text-fg3"
                             }`}
                           >
@@ -102,15 +102,15 @@ export default async function SourcesPage() {
                     {!board.active ? (
                       <span className="text-xs text-fg3">Disabled</span>
                     ) : hasError ? (
-                      <span className="flex items-center gap-1.5 text-red-400 text-xs" title={board.lastError ?? ""}>
+                      <span className="flex items-center gap-1.5 text-red-600 text-xs" title={board.lastError ?? ""}>
                         <AlertCircle size={13} /> Error
                       </span>
                     ) : isWorking ? (
-                      <span className="flex items-center gap-1.5 text-green-400 text-xs">
+                      <span className="flex items-center gap-1.5 text-green-600 text-xs">
                         <CheckCircle size={13} /> OK
                       </span>
                     ) : isWarning ? (
-                      <span className="flex items-center gap-1.5 text-amber-400 text-xs">
+                      <span className="flex items-center gap-1.5 text-amber-600 text-xs">
                         <AlertCircle size={13} /> 0 results
                       </span>
                     ) : (
@@ -122,7 +122,7 @@ export default async function SourcesPage() {
 
                   {/* Total postings */}
                   <td className="px-5 py-4 text-right">
-                    <span className="text-indigo-400 font-semibold tabular-nums">
+                    <span className="text-primary font-semibold tabular-nums">
                       {board._count.postings.toLocaleString()}
                     </span>
                   </td>
@@ -130,7 +130,7 @@ export default async function SourcesPage() {
                   {/* Last run count */}
                   <td className="px-5 py-4 text-right">
                     {lastCount !== null && lastCount !== undefined ? (
-                      <span className={`text-xs font-semibold tabular-nums ${lastCount > 0 ? "text-green-400" : "text-fg3"}`}>
+                      <span className={`text-xs font-semibold tabular-nums ${lastCount > 0 ? "text-green-600" : "text-fg3"}`}>
                         +{lastCount}
                       </span>
                     ) : (
@@ -149,7 +149,7 @@ export default async function SourcesPage() {
                         : "Never"}
                     </span>
                     {hasError && (
-                      <p className="text-red-400 text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
+                      <p className="text-red-600 text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
                         {board.lastError}
                       </p>
                     )}

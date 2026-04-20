@@ -51,7 +51,7 @@ export function SourceControls({ id, slug, active }: Props) {
             type="button"
             onClick={handleScrape}
             disabled={scraping}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg2 hover:text-white hover:bg-surface-raised disabled:opacity-30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg2 hover:text-ink hover:bg-surface-raised disabled:opacity-30 transition-colors"
           >
             {scraping
               ? <Loader2  size={12} className="animate-spin" />
@@ -73,7 +73,7 @@ export function SourceControls({ id, slug, active }: Props) {
           type="button"
           onClick={handleToggle}
           disabled={toggling}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white disabled:opacity-30 transition-colors border border-indigo-500/30"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-soft text-primary hover:bg-primary hover:text-white disabled:opacity-30 transition-colors border border-primary-muted"
         >
           <Power size={12} />
           {toggling ? "Enabling…" : "Enable"}
