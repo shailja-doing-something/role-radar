@@ -79,6 +79,18 @@ interface JSearchResponse {
   data:   JSearchJob[];
 }
 
+interface Layer1Result {
+  postings:          RawPosting[];
+  rateLimitedCount:  number;
+  covered:           number;
+  total:             number;
+}
+
+interface Layer2Result {
+  postings:         RawPosting[];
+  rateLimitedCount: number;
+}
+
 // Before normalization — rawTitle is the original, title filled by normalizeRoles()
 interface RawPosting {
   rawTitle:     string;
@@ -201,8 +213,8 @@ async function fetchJSearch(
   }
 
   if (res.status === 429) {
-    console.warn(`[JSearch] 429 for "${query}" — waiting 5 s and retrying`);
-    await sleep(5000);
+    console.warn(`[JSearch] 429 for "${query}" — waiting 15 s and retrying`);
+    await sleep(15000);
     totalJSearchCalls++;
     try { res = await doFetch(); } catch (e) {
       throw new Error(`JSearch retry failed: ${e instanceof Error ? e.message : e}`);
@@ -227,23 +239,37 @@ async function fetchJSearch(
 // LAYER 1 — Named Team Search (one JSearch call per Top100Team)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function layer1NamedTeamSearch(): Promise<RawPosting[]> {
-  const teams = await prisma.top100Team.findMany({ select: { name: true } });
-  if (teams.length === 0) { console.log("[Layer1] No teams found — skipping"); return []; }
+async function layer1NamedTeamSearch(): Promise<Layer1Result> {
+  const allTeams = await prisma.top100Team.findMany({ select: { name: true } });
+  if (allTeams.length === 0) { console.log("[Layer1] No teams found — skipping"); return { postings: [], rateLimitedCount: 0, covered: 0, total: 0 }; }
+
+  // Shuffle so different teams get covered across runs
+  const shuffled = [...allTeams];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const batch = shuffled.slice(0, 20);
 
   const all: RawPosting[]         = [];
   let   totalCollected            = 0;
   let   totalMatched              = 0;
+  let   rateLimitedCount          = 0;
   const zeroResultTeams: string[] = [];
 
-  for (const { name } of teams) {
+  for (const { name } of batch) {
     let jobs: JSearchJob[];
     try {
       jobs = await fetchJSearch(`${name} real estate jobs`, { numPages: 1 });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[Layer1] "${name}" skipped — ${msg.includes("rate-limited") ? "rate limited" : msg}`);
-      await sleep(500);
+      if (msg.includes("rate-limited")) {
+        console.warn(`[Layer1] "${name}" skipped — rate limited after retry`);
+        rateLimitedCount++;
+      } else {
+        console.warn(`[Layer1] "${name}" skipped — ${msg}`);
+      }
+      await sleep(2000);
       continue;
     }
 
@@ -255,36 +281,39 @@ async function layer1NamedTeamSearch(): Promise<RawPosting[]> {
       totalMatched += matched.length;
       all.push(...matched.map(j => buildPosting(j, true)));
     }
-    await sleep(500);
+    await sleep(2000);
   }
 
   const zeroMsg = zeroResultTeams.length > 0
     ? `, ${zeroResultTeams.length} teams with 0 results: ${zeroResultTeams.slice(0, 10).join(", ")}${zeroResultTeams.length > 10 ? " …" : ""}`
     : "";
-  console.log(`[Layer1] ${teams.length} teams searched, ${totalCollected} collected, ${totalMatched} matched by name${zeroMsg}`);
-  return all;
+  console.log(`[Layer1] ${batch.length}/${allTeams.length} teams searched (randomized), ${totalCollected} collected, ${totalMatched} matched${zeroMsg}`);
+  return { postings: all, rateLimitedCount, covered: batch.length, total: allTeams.length };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYER 2 — ISA Signal Search (5 JSearch calls + Gemini company filter)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function layer2ISASearch(): Promise<RawPosting[]> {
+async function layer2ISASearch(): Promise<Layer2Result> {
   const all: RawPosting[] = [];
   let   totalCollected    = 0;
+  let   rateLimitedCount  = 0;
 
   for (const query of ISA_QUERIES) {
     let jobs: JSearchJob[];
     try {
       jobs = await fetchJSearch(query, { numPages: 1 });
     } catch (e) {
-      console.warn(`[Layer2] skipped "${query}" — ${e instanceof Error ? e.message : e}`);
-      await sleep(500);
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("rate-limited")) rateLimitedCount++;
+      console.warn(`[Layer2] skipped "${query}" — ${msg}`);
+      await sleep(3000);
       continue;
     }
 
     totalCollected += jobs.length;
-    if (jobs.length === 0) { await sleep(500); continue; }
+    if (jobs.length === 0) { await sleep(3000); continue; }
 
     const companies = [...new Set(jobs.map(j => j.employer_name))];
     let keepSet: Set<string>;
@@ -305,11 +334,11 @@ async function layer2ISASearch(): Promise<RawPosting[]> {
     for (const job of jobs) {
       if (keepSet.has(job.employer_name)) all.push(buildPosting(job, false));
     }
-    await sleep(500);
+    await sleep(3000);
   }
 
   console.log(`[Layer2] 5 ISA searches, ${totalCollected} raw, ${all.length} postings after Gemini filter`);
-  return all;
+  return { postings: all, rateLimitedCount };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -572,12 +601,49 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
 
   totalJSearchCalls = 0;
   totalGeminiCalls  = 0;
+  const errorsLog: string[] = [];
   const mode = skipJSearch ? "L3+L4 only (Gemini web search)" : "4-layer strategy";
   console.log(`[Scraper] scrapeAll starting — ${mode}`);
 
+  // ── Test call: abort immediately on 429 ───────────────────────────────────
+  if (!skipJSearch) {
+    let testStatus = 200;
+    try {
+      const testRes = await fetch(
+        "https://jsearch.p.rapidapi.com/search?query=real+estate+jobs&page=1&num_pages=1&country=us",
+        { headers: { "X-RapidAPI-Host": "jsearch.p.rapidapi.com", "X-RapidAPI-Key": apiKey! } }
+      );
+      testStatus = testRes.status;
+      totalJSearchCalls++;
+    } catch (e) {
+      console.warn("[Scraper] Test call network error, proceeding:", e instanceof Error ? e.message : e);
+    }
+    if (testStatus === 429) {
+      const msg = "JSearch quota exhausted or rate limited — scrape aborted. Check RapidAPI dashboard.";
+      console.error("[Scraper] ABORTED — JSearch returning 429 on test call. Quota likely exhausted.");
+      await prisma.scrapeRun.create({ data: { status: "failed", errors: msg, jsearchCallsUsed: totalJSearchCalls } });
+      return;
+    }
+  }
+
   // ── Layers 1–4: collect ───────────────────────────────────────────────────
-  const l1 = skipJSearch ? [] : await layer1NamedTeamSearch();
-  const l2 = skipJSearch ? [] : await layer2ISASearch();
+  const l1Result = skipJSearch
+    ? { postings: [] as RawPosting[], rateLimitedCount: 0, covered: 0, total: 0 }
+    : await layer1NamedTeamSearch();
+
+  errorsLog.push(`Batch: covered ${l1Result.covered} of ${l1Result.total} teams this run (randomized)`);
+  for (const name of l1Result.postings.map(() => "").slice(0, 0)) { void name; } // type satisfaction
+
+  // Layer 2 only if Layer 1 had zero 429 errors
+  const l2Result = (!skipJSearch && l1Result.rateLimitedCount === 0)
+    ? await layer2ISASearch()
+    : { postings: [] as RawPosting[], rateLimitedCount: 0 };
+  if (l1Result.rateLimitedCount > 0) {
+    errorsLog.push(`Layer 2 skipped — ${l1Result.rateLimitedCount} team(s) rate-limited in Layer 1`);
+  }
+
+  const l1 = l1Result.postings;
+  const l2 = l2Result.postings;
   const l3 = await layer3WebsiteSearch();
   const l4 = await layer4BrokerageSearch();
 
@@ -661,9 +727,19 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
 
   // ── Final summary ─────────────────────────────────────────────────────────
   console.log(`[Scraper] Save: ${totalNew} new, ${totalUpdated} updated, ${totalSkipped} duplicates skipped`);
-  console.log(`[Scraper] Total JSearch calls: ${totalJSearchCalls} (≤ 101)`);
+  console.log(`[Scraper] Total JSearch calls: ${totalJSearchCalls}`);
   console.log(`[Scraper] Total Gemini calls:  ${totalGeminiCalls}`);
-  console.log("[Scraper] scrapeAll complete");
+
+  const totalRateLimited = l1Result.rateLimitedCount + l2Result.rateLimitedCount;
+  const runStatus = totalRateLimited > 0 ? "partial" : "success";
+  await prisma.scrapeRun.create({
+    data: {
+      status:           runStatus,
+      errors:           errorsLog.length > 0 ? errorsLog.join("\n") : null,
+      jsearchCallsUsed: totalJSearchCalls,
+    },
+  });
+  console.log(`[Scraper] scrapeAll complete — status: ${runStatus}, JSearch calls: ${totalJSearchCalls}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

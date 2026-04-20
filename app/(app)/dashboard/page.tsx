@@ -27,6 +27,7 @@ export default async function DashboardPage() {
     targetTeamActivity,
     lastScrapedRow,
     recentPostings,
+    lastScrapeRun,
   ] = await Promise.all([
     prisma.jobPosting.count({
       where: { isActive: true, createdAt: { gte: thirtyDaysAgo } },
@@ -74,6 +75,10 @@ export default async function DashboardPage() {
       orderBy: { scrapedAt: "desc" },
       take:    10,
       select:  { id: true, title: true, company: true, location: true, url: true, scrapedAt: true, isTop100: true },
+    }),
+    prisma.scrapeRun.findFirst({
+      orderBy: { createdAt: "desc" },
+      select:  { status: true, errors: true, jsearchCallsUsed: true },
     }),
   ]);
 
@@ -137,7 +142,7 @@ export default async function DashboardPage() {
           </div>
           <p className="text-sm text-fg2">Real estate hiring intelligence — live view</p>
         </div>
-        <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
+        <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} lastScrapeRun={lastScrapeRun ?? null} />
       </div>
 
       {/* ── ROW 1: Stat cards ───────────────────────────────────────────────── */}

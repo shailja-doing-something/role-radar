@@ -99,3 +99,12 @@ model Analysis {
   data      Json
   createdAt DateTime @default(now())
 }
+
+// One record per scrape run — tracks status and JSearch quota usage
+model ScrapeRun {
+  id               Int      @id @default(autoincrement())
+  status           String   // "success" | "partial" | "failed"
+  errors           String?
+  jsearchCallsUsed Int?
+  createdAt        DateTime @default(now())
+}

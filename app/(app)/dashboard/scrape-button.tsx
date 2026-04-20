@@ -6,6 +6,12 @@ import { useToast } from "@/components/ui/toast";
 
 type Status = "idle" | "running";
 
+interface LastScrapeRun {
+  status:           string;
+  errors:           string | null;
+  jsearchCallsUsed: number | null;
+}
+
 function formatLastScraped(iso: string | null | undefined): string {
   if (!iso) return "Never scraped";
   const diff  = Date.now() - new Date(iso).getTime();
@@ -17,7 +23,7 @@ function formatLastScraped(iso: string | null | undefined): string {
   return `Last scraped ${days}d ago`;
 }
 
-export function ScrapeButton({ lastScraped }: { lastScraped?: string | null }) {
+export function ScrapeButton({ lastScraped, lastScrapeRun }: { lastScraped?: string | null; lastScrapeRun?: LastScrapeRun | null }) {
   const [status,  setStatus]  = useState<Status>("idle");
   const { toast }             = useToast();
   const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -96,6 +102,35 @@ export function ScrapeButton({ lastScraped }: { lastScraped?: string | null }) {
         </button>
       </div>
       <span className="text-xs text-fg3">{formatLastScraped(lastScraped)}</span>
+      {lastScrapeRun && (() => {
+        const isQuotaFail = lastScrapeRun.status === "failed" &&
+          !!lastScrapeRun.errors &&
+          (lastScrapeRun.errors.toLowerCase().includes("quota") ||
+           lastScrapeRun.errors.toLowerCase().includes("rate limited"));
+        const isPartial = lastScrapeRun.status === "partial";
+        return (
+          <>
+            {isQuotaFail && (
+              <span className="text-xs" style={{ color: "#D97706" }}>
+                JSearch quota exhausted —{" "}
+                <a href="https://rapidapi.com" target="_blank" rel="noopener noreferrer" className="underline">
+                  Check usage →
+                </a>
+              </span>
+            )}
+            {isPartial && !isQuotaFail && (
+              <span className="text-xs text-fg3">
+                Last scrape was partial — some teams were rate limited
+              </span>
+            )}
+            {lastScrapeRun.jsearchCallsUsed != null && (
+              <span className="text-[11px] text-fg3">
+                Last run used {lastScrapeRun.jsearchCallsUsed} of ~200 monthly calls
+              </span>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
