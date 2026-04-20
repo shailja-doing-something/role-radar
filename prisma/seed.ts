@@ -222,23 +222,35 @@ async function main() {
   }
   console.log(`Seeded ${JOB_BOARDS.length} job boards.`);
 
-  // Top100Teams: preserve any existing isaPresence/marketingOpsPresence values
-  // set via the Signals dashboard before wiping and re-seeding.
+  // Top100Teams: upsert the hardcoded list by name — never delete, so any
+  // teams imported via /api/supabase/import-all-teams survive redeployment.
   console.log("Seeding Top 100 Teams...");
   const existingTeams = await prisma.top100Team.findMany({
-    select: { name: true, isaPresence: true, marketingOpsPresence: true, supabaseTeamId: true },
+    select: { id: true, name: true, isaPresence: true, marketingOpsPresence: true, supabaseTeamId: true },
   });
   const signalMap = new Map(existingTeams.map(t => [t.name, t]));
-  await prisma.top100Team.deleteMany({});
-  await prisma.top100Team.createMany({
-    data: TOP_100_TEAMS.map(t => ({
-      ...t,
-      isaPresence:          signalMap.get(t.name)?.isaPresence          ?? "Unknown",
-      marketingOpsPresence: signalMap.get(t.name)?.marketingOpsPresence ?? "Unknown",
-      supabaseTeamId:       signalMap.get(t.name)?.supabaseTeamId       ?? null,
-    })),
-  });
-  console.log(`Seeded ${TOP_100_TEAMS.length} teams.`);
+
+  let seeded = 0;
+  for (const team of TOP_100_TEAMS) {
+    const existing = signalMap.get(team.name);
+    if (existing) {
+      // Refresh static metadata; preserve signals and supabaseTeamId
+      await prisma.top100Team.update({
+        where: { id: existing.id },
+        data:  { brokerage: team.brokerage, location: team.location, website: team.website },
+      });
+    } else {
+      await prisma.top100Team.create({
+        data: {
+          ...team,
+          isaPresence:          "Unknown",
+          marketingOpsPresence: "Unknown",
+        },
+      });
+    }
+    seeded++;
+  }
+  console.log(`Seeded ${seeded} teams.`);
 }
 
 main()
