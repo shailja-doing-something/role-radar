@@ -6,6 +6,7 @@ import {
 import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -123,7 +124,10 @@ export default async function DashboardPage() {
           </div>
           <p className="text-sm text-fg2">Real estate hiring intelligence — live view</p>
         </div>
-        <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
+        </div>
       </div>
 
       {/* ── ROW 1: Stat cards ───────────────────────────────────────────────── */}
@@ -154,7 +158,7 @@ export default async function DashboardPage() {
           label="ISA Roles Open"
           value={isaCount.toLocaleString()}
           sub="active ISA postings"
-          color="#111111"
+          color="#737373"
           icon={Phone}
         />
       </div>
@@ -203,7 +207,7 @@ export default async function DashboardPage() {
             ISA roles represent{" "}
             <span className="text-ink font-semibold">{isaPct}%</span>
             {" "}of all real estate hiring —{" "}
-            <span className={isaAbove ? "text-green-700" : "text-amber-700"}>
+            <span style={{ color: isaAbove ? "var(--success)" : "var(--warning)" }}>
               {isaAbove ? "above" : "below"}
             </span>
             {" "}market average of 30%
@@ -335,12 +339,6 @@ function roleBadge(title: string): string {
   const t = title.toLowerCase();
   if (t.includes("inside sales") || /\bisa\b/.test(t))
     return "bg-primary-soft text-primary border-primary-muted";
-  if (t.includes("marketing"))
-    return "bg-purple-50 text-purple-700 border-purple-200";
-  if (t.includes("operations") || t.includes("admin") || t.includes("manager"))
-    return "bg-blue-50 text-blue-700 border-blue-200";
-  if (t.includes("transaction") || t.includes("coordinator") || t.includes("listing"))
-    return "bg-green-50 text-green-700 border-green-200";
   return "bg-surface-raised text-fg2 border-edge";
 }
 
@@ -388,9 +386,8 @@ function StatCard({
         <div className="flex items-center gap-2">
           {trend != null && (
             <span
-              className={`flex items-center gap-0.5 text-[11px] font-semibold ${
-                trend >= 0 ? "text-green-600" : "text-red-600"
-              }`}
+              className="flex items-center gap-0.5 text-[11px] font-semibold"
+              style={{ color: trend >= 0 ? "var(--success)" : "var(--danger)" }}
             >
               {trend >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
               {trend >= 0 ? "+" : ""}{trend}% vs prev 30d

@@ -134,7 +134,7 @@ export function AddSourceForm() {
             </p>
           </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-[var(--danger)] text-sm">{error}</p>}
 
           <div className="mt-auto flex gap-3 pt-2">
             <button

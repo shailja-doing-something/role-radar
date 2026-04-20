@@ -38,10 +38,10 @@ const PRESENCE_OPTIONS = ["Confirmed", "Likely", "None", "Unknown"] as const;
 type PresenceValue = (typeof PRESENCE_OPTIONS)[number];
 
 const PRESENCE: Record<PresenceValue, { badge: string; icon: React.ElementType }> = {
-  Confirmed: { badge: "bg-green-50 border-green-200 text-green-700",   icon: CheckCircle2 },
-  Likely:    { badge: "bg-amber-50 border-amber-200 text-amber-700",   icon: AlertCircle  },
-  None:      { badge: "bg-surface-raised border-edge text-fg3",        icon: MinusCircle  },
-  Unknown:   { badge: "bg-surface-raised border-edge text-fg3",        icon: HelpCircle   },
+  Confirmed: { badge: "bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success)]",   icon: CheckCircle2 },
+  Likely:    { badge: "bg-[var(--warning-soft)] border-[var(--warning-border)] text-[var(--warning)]",   icon: AlertCircle  },
+  None:      { badge: "bg-surface-raised border-edge text-fg3",                                          icon: MinusCircle  },
+  Unknown:   { badge: "bg-surface-raised border-edge text-fg3",                                          icon: HelpCircle   },
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -155,8 +155,8 @@ function VelocityBadge({ velocity }: { velocity: "Hot" | "Active" | "None" }) {
   const isHot = velocity === "Hot";
   const cls    = isHot
     ? "bg-primary-soft border-primary-muted text-primary"
-    : "bg-green-50 border-green-200 text-green-700";
-  const dotCls = isHot ? "bg-primary animate-pulse" : "bg-green-600";
+    : "bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success)]";
+  const dotCls = isHot ? "bg-primary animate-pulse" : "bg-[var(--success)]";
   const label  = isHot ? "Scaling Up" : "Hiring";
 
   return (

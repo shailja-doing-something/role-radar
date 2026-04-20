@@ -14,6 +14,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface NavItem {
   href:  string;
@@ -61,9 +62,14 @@ export function Nav() {
 
   return (
     <nav
-      className={`shrink-0 bg-surface border-r border-edge flex flex-col h-screen sticky top-0 transition-all duration-200 ${
+      className={`shrink-0 flex flex-col h-screen sticky top-0 transition-all duration-200 ${
         collapsed ? "w-[60px]" : "w-[240px]"
       }`}
+      style={{
+        background:   "var(--sidebar-bg)",
+        borderRight:  "1px solid var(--sidebar-border)",
+        boxShadow:    "var(--sidebar-shadow, none)",
+      }}
     >
       {/* Logo */}
       <div
@@ -121,6 +127,11 @@ export function Nav() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Theme toggle */}
+      <div className={`px-2 pt-3 shrink-0 ${collapsed ? "flex justify-center" : "flex"}`}>
+        <ThemeToggle />
       </div>
 
       {/* Collapse toggle */}

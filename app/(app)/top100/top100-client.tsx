@@ -41,8 +41,8 @@ function VelocityBadge({ roleCount }: { roleCount: number }) {
   }
   if (roleCount >= 1) {
     return (
-      <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+      <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--success)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
         Hiring
       </span>
     );
@@ -140,7 +140,7 @@ function TeamCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(team.id, team.name); }}
             disabled={deletingId === team.id}
-            className="text-fg3 hover:text-red-400 disabled:opacity-40 transition-colors"
+            className="text-fg3 hover:text-[var(--danger)] disabled:opacity-40 transition-colors"
           >
             <Trash2 size={13} />
           </button>
@@ -286,7 +286,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
               />
             </div>
           ))}
-          {addError && <p className="text-red-600 text-sm">{addError}</p>}
+          {addError && <p className="text-[var(--danger)] text-sm">{addError}</p>}
           <div className="mt-auto flex gap-3 pt-2">
             <button
               type="submit"
@@ -416,7 +416,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                         type="button"
                         onClick={() => handleDelete(team.id, team.name)}
                         disabled={deletingId === team.id}
-                        className="text-fg3 hover:text-red-400 disabled:opacity-40 transition-colors"
+                        className="text-fg3 hover:text-[var(--danger)] disabled:opacity-40 transition-colors"
                       >
                         <Trash2 size={13} />
                       </button>

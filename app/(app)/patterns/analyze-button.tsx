@@ -53,7 +53,7 @@ export function AnalyzeButton({ lastAnalyzed }: { lastAnalyzed?: string | null }
             : <RefreshCw size={14} />}
           {loading ? "Analyzing…" : "Refresh Analysis"}
         </button>
-        {error && <span className="text-red-600 text-sm">{error}</span>}
+        {error && <span className="text-[var(--danger)] text-sm">{error}</span>}
       </div>
       <span className="text-xs text-fg3">{formatLastAnalyzed(lastAnalyzed)}</span>
     </div>

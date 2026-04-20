@@ -33,9 +33,9 @@ const LIMIT = 50;
 function roleAccent(title: string): string {
   const t = title.toLowerCase();
   if (t.includes("inside sales") || t.startsWith("isa")) return "text-primary";
-  if (t.includes("market")) return "text-purple-600";
-  if (t.includes("ops") || t.includes("operat")) return "text-blue-600";
-  if (t.includes("transaction") || t.includes("tc")) return "text-green-600";
+  if (t.includes("market")) return "text-fg2";
+  if (t.includes("ops") || t.includes("operat")) return "text-fg2";
+  if (t.includes("transaction") || t.includes("tc")) return "text-[var(--success)]";
   return "text-ink";
 }
 
@@ -284,7 +284,7 @@ export default function PostingsPage() {
                   </td>
                   <td className="px-4 py-3.5">
                     {p.salary ? (
-                      <span className="flex items-center gap-1 text-green-600 text-xs">
+                      <span className="flex items-center gap-1 text-[var(--success)] text-xs">
                         <DollarSign size={11} className="shrink-0" />
                         {p.salary.slice(0, 22)}
                       </span>

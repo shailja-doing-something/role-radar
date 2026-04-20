@@ -16,14 +16,14 @@ interface Props {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function TrendIcon({ trend }: { trend: string }) {
-  if (trend === "rising")    return <TrendingUp   size={13} className="text-green-600 shrink-0" />;
-  if (trend === "declining") return <TrendingDown size={13} className="text-red-600 shrink-0" />;
+  if (trend === "rising")    return <TrendingUp   size={13} className="text-[var(--success)] shrink-0" />;
+  if (trend === "declining") return <TrendingDown size={13} className="text-[var(--danger)] shrink-0" />;
   return                            <Minus        size={13} className="text-fg3 shrink-0" />;
 }
 
 function trendClass(trend: string) {
-  if (trend === "rising")    return "text-green-600";
-  if (trend === "declining") return "text-red-600";
+  if (trend === "rising")    return "text-[var(--success)]";
+  if (trend === "declining") return "text-[var(--danger)]";
   return "text-fg3";
 }
 
@@ -188,7 +188,7 @@ export function PatternsClient({ analysis, createdAt }: Props) {
 
         {/* Right: Emerging Signals */}
         <div>
-          <SectionHeader icon={Zap} label="Emerging Signals" color="text-amber-500" />
+          <SectionHeader icon={Zap} label="Emerging Signals" color="text-[var(--warning)]" />
           {emergingSignals.length === 0 ? (
             <div className="bg-surface border border-edge rounded-xl py-8 text-center">
               <p className="text-fg3 text-sm">No signals yet</p>

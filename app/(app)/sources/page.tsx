@@ -58,7 +58,7 @@ export default async function SourcesPage() {
                     <div className="flex items-start gap-2.5">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
-                          board.active ? "bg-green-500" : "bg-fg3"
+                          board.active ? "bg-[var(--success)]" : "bg-fg3"
                         }`}
                       />
                       <div>
@@ -83,7 +83,7 @@ export default async function SourcesPage() {
                           <span
                             className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
                               board.category === "niche"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                ? "bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary-muted)]"
                                 : "bg-surface-raised border border-edge text-fg3"
                             }`}
                           >
@@ -102,15 +102,15 @@ export default async function SourcesPage() {
                     {!board.active ? (
                       <span className="text-xs text-fg3">Disabled</span>
                     ) : hasError ? (
-                      <span className="flex items-center gap-1.5 text-red-600 text-xs" title={board.lastError ?? ""}>
+                      <span className="flex items-center gap-1.5 text-[var(--danger)] text-xs" title={board.lastError ?? ""}>
                         <AlertCircle size={13} /> Error
                       </span>
                     ) : isWorking ? (
-                      <span className="flex items-center gap-1.5 text-green-600 text-xs">
+                      <span className="flex items-center gap-1.5 text-[var(--success)] text-xs">
                         <CheckCircle size={13} /> OK
                       </span>
                     ) : isWarning ? (
-                      <span className="flex items-center gap-1.5 text-amber-600 text-xs">
+                      <span className="flex items-center gap-1.5 text-[var(--warning)] text-xs">
                         <AlertCircle size={13} /> 0 results
                       </span>
                     ) : (
@@ -130,7 +130,7 @@ export default async function SourcesPage() {
                   {/* Last run count */}
                   <td className="px-5 py-4 text-right">
                     {lastCount !== null && lastCount !== undefined ? (
-                      <span className={`text-xs font-semibold tabular-nums ${lastCount > 0 ? "text-green-600" : "text-fg3"}`}>
+                      <span className={`text-xs font-semibold tabular-nums ${lastCount > 0 ? "text-[var(--success)]" : "text-fg3"}`}>
                         +{lastCount}
                       </span>
                     ) : (
@@ -149,7 +149,7 @@ export default async function SourcesPage() {
                         : "Never"}
                     </span>
                     {hasError && (
-                      <p className="text-red-600 text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
+                      <p className="text-[var(--danger)] text-xs mt-0.5 max-w-48 truncate" title={board.lastError ?? ""}>
                         {board.lastError}
                       </p>
                     )}

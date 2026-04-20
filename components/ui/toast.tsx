@@ -28,15 +28,15 @@ let _id = 0;
 const ICON = { success: CheckCircle, error: AlertCircle, info: Info } as const;
 
 const BORDER = {
-  success: "border-l-green-600",
-  error:   "border-l-red-600",
-  info:    "border-l-orange-500",
+  success: "border-l-[var(--success)]",
+  error:   "border-l-[var(--danger)]",
+  info:    "border-l-[var(--primary)]",
 } as const;
 
 const ICON_COLOR = {
-  success: "text-green-600",
-  error:   "text-red-600",
-  info:    "text-orange-500",
+  success: "text-[var(--success)]",
+  error:   "text-[var(--danger)]",
+  info:    "text-[var(--primary)]",
 } as const;
 
 export function ToastProvider({ children }: { children: ReactNode }) {

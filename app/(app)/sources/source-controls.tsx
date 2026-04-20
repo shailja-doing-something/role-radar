@@ -62,7 +62,7 @@ export function SourceControls({ id, slug, active }: Props) {
             type="button"
             onClick={handleToggle}
             disabled={toggling}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg3 hover:text-red-400 hover:bg-surface-raised disabled:opacity-30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-fg3 hover:text-[var(--danger)] hover:bg-surface-raised disabled:opacity-30 transition-colors"
           >
             <PowerOff size={12} />
             {toggling ? "Disabling…" : "Disable"}
