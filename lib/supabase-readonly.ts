@@ -1,19 +1,31 @@
 import { Pool } from "pg";
-import dns from "dns";
-
-// Force IPv4 — Railway cannot reach Supabase over IPv6
-dns.setDefaultResultOrder("ipv4first");
+import { lookup } from "dns";
+import { promisify } from "util";
 
 if (!process.env.SUPABASE_DB_URL) {
   throw new Error("SUPABASE_DB_URL is not set");
 }
 
-// Read-only connection pool — SELECT queries only
-const supabaseReadonly = new Pool({
-  connectionString: process.env.SUPABASE_DB_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 3,
-});
+const dnsLookup = promisify(lookup);
+
+// Resolve Supabase hostname to IPv4 before creating the pool.
+// Railway cannot reach Supabase over IPv6 (ENETUNREACH).
+async function buildPool(): Promise<Pool> {
+  const url = new URL(process.env.SUPABASE_DB_URL!);
+  try {
+    const result = await dnsLookup(url.hostname, { family: 4 });
+    url.hostname = (result as unknown as { address: string }).address;
+  } catch {
+    // fall back to original hostname
+  }
+  return new Pool({
+    connectionString: url.toString(),
+    ssl: { rejectUnauthorized: false },
+    max: 3,
+  });
+}
+
+const poolPromise: Promise<Pool> = buildPool();
 
 const FORBIDDEN = /^\s*(insert|update|delete|drop|alter|create|truncate|replace)/i;
 
@@ -25,7 +37,8 @@ export async function readonlyQuery<T = Record<string, unknown>>(
   if (FORBIDDEN.test(sql.trim())) {
     throw new Error("Write operations are not permitted on the Supabase read-only connection.");
   }
-  const client = await supabaseReadonly.connect();
+  const pool   = await poolPromise;
+  const client = await pool.connect();
   try {
     const result = await client.query(sql, params);
     return result.rows as T[];
@@ -34,4 +47,4 @@ export async function readonlyQuery<T = Record<string, unknown>>(
   }
 }
 
-export default supabaseReadonly;
+export default poolPromise;
