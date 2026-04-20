@@ -634,13 +634,10 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
   errorsLog.push(`Batch: covered ${l1Result.covered} of ${l1Result.total} teams this run (randomized)`);
   for (const name of l1Result.postings.map(() => "").slice(0, 0)) { void name; } // type satisfaction
 
-  // Layer 2 only if Layer 1 had zero 429 errors
-  const l2Result = (!skipJSearch && l1Result.rateLimitedCount === 0)
-    ? await layer2ISASearch()
-    : { postings: [] as RawPosting[], rateLimitedCount: 0 };
-  if (l1Result.rateLimitedCount > 0) {
-    errorsLog.push(`Layer 2 skipped — ${l1Result.rateLimitedCount} team(s) rate-limited in Layer 1`);
-  }
+  // Layer 2 always runs (broad ISA searches cover all teams, not just Layer 1 batch)
+  const l2Result = skipJSearch
+    ? { postings: [] as RawPosting[], rateLimitedCount: 0 }
+    : await layer2ISASearch();
 
   const l1 = l1Result.postings;
   const l2 = l2Result.postings;
