@@ -131,6 +131,15 @@ body {
   animation: shimmer 1.6s infinite linear;
 }
 
+/* ── Dark mode table overrides ─────────────────────────────────────────────── */
+.dark table thead tr {
+  background-color: #111111;
+}
+
+.dark table tbody tr:hover {
+  background-color: #1A1A1A !important;
+}
+
 /* ── Toast slide-up ────────────────────────────────────────────────────────── */
 @keyframes toast-in {
   from { transform: translateY(16px); opacity: 0; }
