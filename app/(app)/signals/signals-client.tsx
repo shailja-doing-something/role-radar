@@ -368,7 +368,7 @@ export function SignalsClient() {
           </h1>
         </div>
         <p className="text-sm text-fg2">
-          See which of your 95 target accounts are actively hiring ISA roles right now — and which already have an ISA or Marketing team in place.
+          See which of your target accounts are actively hiring ISA roles right now — and which already have an ISA or Marketing team in place.
         </p>
       </div>
 
