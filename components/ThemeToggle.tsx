@@ -19,7 +19,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="flex items-center justify-center w-8 h-8 rounded-lg text-fg2 hover:text-ink transition-all duration-150"
+      className="flex items-center justify-center w-8 h-8 rounded-lg text-fg3 hover:text-primary transition-all duration-150"
       style={{ opacity: 1 }}
     >
       <span

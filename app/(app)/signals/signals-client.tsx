@@ -475,7 +475,7 @@ export function SignalsClient() {
             </h1>
           </div>
           <p className="text-sm text-fg2">
-            Live hiring intelligence across your Top 100 target accounts
+            Live hiring intelligence across your target accounts
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">

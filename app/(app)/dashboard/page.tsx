@@ -6,7 +6,6 @@ import {
 import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -124,10 +123,7 @@ export default async function DashboardPage() {
           </div>
           <p className="text-sm text-fg2">Real estate hiring intelligence — live view</p>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
-        </div>
+        <ScrapeButton lastScraped={lastScrapedRow?.lastScraped?.toISOString() ?? null} />
       </div>
 
       {/* ── ROW 1: Stat cards ───────────────────────────────────────────────── */}
@@ -143,14 +139,14 @@ export default async function DashboardPage() {
         <StatCard
           label="Target Account Postings"
           value={targetPostings.toLocaleString()}
-          sub="from Top 100 teams"
+          sub="from target accounts"
           color="#FB923C"
           icon={Target}
         />
         <StatCard
           label="Actively Hiring Teams"
           value={activelyHiringTeams.toLocaleString()}
-          sub="Top 100 with live roles"
+          sub="target accounts with live roles"
           color="#FDBA74"
           icon={Users}
         />

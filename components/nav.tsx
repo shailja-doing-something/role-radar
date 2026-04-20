@@ -45,7 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Accounts",
     items: [
-      { href: "/top100", label: "Top 100 Teams", icon: Trophy },
+      { href: "/top100", label: "Target Accounts", icon: Trophy },
     ],
   },
   {
@@ -74,14 +74,23 @@ export function Nav() {
       {/* Logo */}
       <div
         className={`flex items-center h-16 shrink-0 border-b border-edge ${
-          collapsed ? "justify-center px-0" : "gap-2.5 px-6"
+          collapsed ? "justify-center px-0" : "px-4"
         }`}
       >
-        <span className="w-[18px] h-[18px] rounded-full bg-primary shrink-0 flex items-center justify-center" />
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+          <circle cx="14" cy="14" r="12" stroke="#F97316" strokeWidth="1.5" fill="none" opacity="0.3"/>
+          <circle cx="14" cy="14" r="7.5" stroke="#F97316" strokeWidth="1.5" fill="none" opacity="0.6"/>
+          <circle cx="14" cy="14" r="2.5" fill="#F97316"/>
+          <line x1="14" y1="14" x2="23" y2="6" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+          <circle cx="22" cy="7" r="1.5" fill="#F97316"/>
+        </svg>
         {!collapsed && (
-          <span className="text-ink font-bold text-[16px] tracking-tight">
-            RoleRadar
-          </span>
+          <>
+            <span className="flex-1 text-ink font-bold text-[16px] tracking-tight ml-2.5">
+              RoleRadar
+            </span>
+            <ThemeToggle />
+          </>
         )}
       </div>
 
@@ -127,11 +136,6 @@ export function Nav() {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Theme toggle */}
-      <div className={`px-2 pt-3 shrink-0 ${collapsed ? "flex justify-center" : "flex"}`}>
-        <ThemeToggle />
       </div>
 
       {/* Collapse toggle */}
