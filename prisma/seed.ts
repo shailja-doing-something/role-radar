@@ -226,7 +226,7 @@ async function main() {
   // set via the Signals dashboard before wiping and re-seeding.
   console.log("Seeding Top 100 Teams...");
   const existingTeams = await prisma.top100Team.findMany({
-    select: { name: true, isaPresence: true, marketingOpsPresence: true },
+    select: { name: true, isaPresence: true, marketingOpsPresence: true, supabaseTeamId: true },
   });
   const signalMap = new Map(existingTeams.map(t => [t.name, t]));
   await prisma.top100Team.deleteMany({});
@@ -235,6 +235,7 @@ async function main() {
       ...t,
       isaPresence:          signalMap.get(t.name)?.isaPresence          ?? "Unknown",
       marketingOpsPresence: signalMap.get(t.name)?.marketingOpsPresence ?? "Unknown",
+      supabaseTeamId:       signalMap.get(t.name)?.supabaseTeamId       ?? null,
     })),
   });
   console.log(`Seeded ${TOP_100_TEAMS.length} teams.`);
