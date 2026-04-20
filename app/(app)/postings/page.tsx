@@ -32,11 +32,11 @@ const LIMIT = 50;
 
 function roleAccent(title: string): string {
   const t = title.toLowerCase();
-  if (t.includes("inside sales") || t.startsWith("isa")) return "text-indigo-400";
-  if (t.includes("market")) return "text-purple-400";
-  if (t.includes("ops") || t.includes("operat")) return "text-blue-400";
-  if (t.includes("transaction") || t.includes("tc")) return "text-green-400";
-  return "text-white";
+  if (t.includes("inside sales") || t.startsWith("isa")) return "text-primary";
+  if (t.includes("market")) return "text-purple-600";
+  if (t.includes("ops") || t.includes("operat")) return "text-blue-600";
+  if (t.includes("transaction") || t.includes("tc")) return "text-green-600";
+  return "text-ink";
 }
 
 function FilterPill({
@@ -51,10 +51,10 @@ function FilterPill({
   return (
     <div className={`flex items-center gap-2 rounded-lg px-3 py-2 border transition-colors ${
       active
-        ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-400"
+        ? "bg-primary-soft border-primary-muted text-primary"
         : "bg-surface border-edge"
     }`}>
-      <Icon size={13} className={active ? "text-indigo-400" : "text-fg3"} />
+      <Icon size={13} className={active ? "text-primary" : "text-fg3"} />
       {children}
     </div>
   );
@@ -128,8 +128,8 @@ export default function PostingsPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <Briefcase size={20} className="text-indigo-400" />
-            <h1 className="text-2xl font-semibold text-white">
+            <Briefcase size={20} className="text-primary" />
+            <h1 className="text-2xl font-semibold text-ink">
               Postings
               {data && (
                 <span className="text-fg3 text-base font-normal ml-3">
@@ -148,13 +148,13 @@ export default function PostingsPage() {
         <div className="flex items-center gap-2 bg-surface border border-edge rounded-lg px-3 py-2 flex-1 min-w-52">
           <Search size={14} className="text-fg3 shrink-0" />
           <input
-            className="bg-transparent text-white text-sm placeholder-fg3 outline-none w-full"
+            className="bg-transparent text-ink text-sm placeholder-fg3 outline-none w-full"
             placeholder="Search title or company…"
             value={q}
             onChange={(e) => { setQ(e.target.value); setPage(1); }}
           />
           {q && (
-            <button type="button" onClick={() => { setQ(""); setPage(1); }} className="text-fg3 hover:text-white">
+            <button type="button" onClick={() => { setQ(""); setPage(1); }} className="text-fg3 hover:text-ink">
               <X size={12} />
             </button>
           )}
@@ -193,8 +193,8 @@ export default function PostingsPage() {
           onClick={() => { setTop100Only((v) => !v); setPage(1); }}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
             top100Only
-              ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-400"
-              : "bg-surface border-edge text-fg2 hover:text-white"
+              ? "bg-primary-soft border-primary-muted text-primary"
+              : "bg-surface border-edge text-fg2 hover:text-ink"
           }`}
         >
           <Target size={13} />
@@ -205,7 +205,7 @@ export default function PostingsPage() {
           <button
             type="button"
             onClick={clearFilters}
-            className="flex items-center gap-1.5 text-sm text-fg3 hover:text-white transition-colors px-2"
+            className="flex items-center gap-1.5 text-sm text-fg3 hover:text-ink transition-colors px-2"
           >
             <X size={13} /> Clear
           </button>
@@ -256,7 +256,7 @@ export default function PostingsPage() {
                         {p.title}
                       </span>
                       {p.remote && (
-                        <span className="shrink-0 text-[11px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                        <span className="shrink-0 text-[11px] bg-primary-soft text-primary border border-primary-muted px-1.5 py-0.5 rounded">
                           Remote
                         </span>
                       )}
@@ -267,7 +267,7 @@ export default function PostingsPage() {
                       <span className="text-fg2 truncate">{p.company}</span>
                       {p.isTop100 && (
                         <span title="Target account">
-                          <Target size={11} className="text-indigo-400 shrink-0" />
+                          <Target size={11} className="text-primary shrink-0" />
                         </span>
                       )}
                     </div>
@@ -284,7 +284,7 @@ export default function PostingsPage() {
                   </td>
                   <td className="px-4 py-3.5">
                     {p.salary ? (
-                      <span className="flex items-center gap-1 text-green-400 text-xs">
+                      <span className="flex items-center gap-1 text-green-600 text-xs">
                         <DollarSign size={11} className="shrink-0" />
                         {p.salary.slice(0, 22)}
                       </span>
@@ -307,7 +307,7 @@ export default function PostingsPage() {
                       href={p.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-fg3 hover:text-indigo-400 transition-colors"
+                      className="text-fg3 hover:text-primary transition-colors"
                     >
                       <ExternalLink size={14} />
                     </a>
@@ -330,7 +330,7 @@ export default function PostingsPage() {
               type="button"
               disabled={page === 1}
               onClick={() => setPage(page - 1)}
-              className="px-3 py-1.5 text-sm bg-surface border border-edge rounded-lg text-fg2 hover:border-indigo-500/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm bg-surface border border-edge rounded-lg text-fg2 hover:border-primary-muted hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Previous
             </button>
@@ -338,7 +338,7 @@ export default function PostingsPage() {
               type="button"
               disabled={page === totalPages}
               onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 text-sm bg-surface border border-edge rounded-lg text-fg2 hover:border-indigo-500/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm bg-surface border border-edge rounded-lg text-fg2 hover:border-primary-muted hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Next
             </button>
