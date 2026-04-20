@@ -27,8 +27,8 @@ export default async function Top100Page() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <Trophy size={20} className="text-indigo-400" />
-            <h1 className="text-2xl font-semibold text-white">Top 100 Teams</h1>
+            <Trophy size={20} className="text-primary" />
+            <h1 className="text-2xl font-semibold text-ink">Top 100 Teams</h1>
           </div>
           <p className="text-sm text-fg2">Target accounts tracked for ISA &amp; ops hiring signals</p>
         </div>

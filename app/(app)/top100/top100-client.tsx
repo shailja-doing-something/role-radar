@@ -33,16 +33,16 @@ function timeAgo(iso: string): string {
 function VelocityBadge({ roleCount }: { roleCount: number }) {
   if (roleCount >= 3) {
     return (
-      <span className="flex items-center gap-1 text-[11px] font-semibold text-red-400">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-        Hot
+      <span className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+        Scaling Up
       </span>
     );
   }
   if (roleCount >= 1) {
     return (
-      <span className="flex items-center gap-1 text-[11px] font-semibold text-green-400">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+      <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
         Hiring
       </span>
     );
@@ -87,9 +87,9 @@ function TeamCard({
   }
 
   const accentClass = team.roleCount >= 3
-    ? "border-l-red-500"
+    ? "border-l-primary"
     : team.roleCount >= 1
-    ? "border-l-green-500"
+    ? "border-l-green-600"
     : "border-l-edge";
 
   return (
@@ -101,7 +101,7 @@ function TeamCard({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-white font-semibold text-sm truncate">{team.name}</span>
+            <span className="text-ink font-semibold text-sm truncate">{team.name}</span>
             <VelocityBadge roleCount={team.roleCount} />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -131,7 +131,7 @@ function TeamCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-fg3 hover:text-indigo-400 transition-colors"
+              className="text-fg3 hover:text-primary transition-colors"
             >
               <ExternalLink size={13} />
             </a>
@@ -264,11 +264,11 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
         }`}
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-edge">
-          <h2 className="text-white font-semibold">Add Team</h2>
+          <h2 className="text-ink font-semibold">Add Team</h2>
           <button
             type="button"
             onClick={() => setShowDrawer(false)}
-            className="text-fg3 hover:text-white transition-colors"
+            className="text-fg3 hover:text-ink transition-colors"
           >
             <X size={18} />
           </button>
@@ -282,23 +282,23 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 placeholder={placeholder}
                 required={required ?? false}
-                className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-white text-sm placeholder-fg3 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-surface-raised border border-edge rounded-lg px-3 py-2 text-ink text-sm placeholder-fg3 focus:outline-none focus:border-primary transition-colors"
               />
             </div>
           ))}
-          {addError && <p className="text-red-400 text-sm">{addError}</p>}
+          {addError && <p className="text-red-600 text-sm">{addError}</p>}
           <div className="mt-auto flex gap-3 pt-2">
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="flex-1 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               {saving ? "Adding…" : "Add Team"}
             </button>
             <button
               type="button"
               onClick={() => setShowDrawer(false)}
-              className="px-4 py-2 text-sm text-fg2 hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-fg2 hover:text-ink transition-colors"
             >
               Cancel
             </button>
@@ -320,13 +320,13 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                 onClick={() => setTab(t)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   active
-                    ? "bg-surface-raised text-white"
-                    : "text-fg2 hover:text-white"
+                    ? "bg-surface-raised text-ink"
+                    : "text-fg2 hover:text-ink"
                 }`}
               >
                 <span className="capitalize">{t}</span>
                 <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
-                  active ? "bg-indigo-500/20 text-indigo-400" : "bg-surface-raised text-fg3"
+                  active ? "bg-primary-soft text-primary" : "bg-surface-raised text-fg3"
                 }`}>
                   {count}
                 </span>
@@ -338,7 +338,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
         <button
           type="button"
           onClick={() => setShowDrawer(true)}
-          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={14} /> Add Team
         </button>
@@ -383,7 +383,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                     className="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-raised transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">{team.name}</p>
+                      <p className="text-ink text-sm font-medium truncate">{team.name}</p>
                       <div className="flex items-center gap-3 mt-0.5">
                         {team.brokerage && (
                           <span className="flex items-center gap-1 text-fg3 text-xs">
@@ -407,7 +407,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                           href={team.website.startsWith("http") ? team.website : `https://${team.website}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-fg3 hover:text-indigo-400 transition-colors"
+                          className="text-fg3 hover:text-primary transition-colors"
                         >
                           <ExternalLink size={13} />
                         </a>
