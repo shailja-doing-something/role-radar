@@ -1,11 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  Zap, Sparkles, ExternalLink, Search, X,
-  CheckCircle2, AlertCircle, MinusCircle, HelpCircle,
-  ChevronDown, Check,
-} from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Zap, ExternalLink, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LiveLabel, StaticLabel } from "@/components/source-labels";
@@ -37,16 +33,6 @@ interface TeamSignal {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PRESENCE_OPTIONS = ["Confirmed", "Likely", "None", "Unknown"] as const;
-type PresenceValue = (typeof PRESENCE_OPTIONS)[number];
-
-const PRESENCE: Record<PresenceValue, { badge: string; icon: React.ElementType }> = {
-  Confirmed: { badge: "bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success)]",   icon: CheckCircle2 },
-  Likely:    { badge: "bg-[var(--warning-soft)] border-[var(--warning-border)] text-[var(--warning)]",   icon: AlertCircle  },
-  None:      { badge: "bg-surface-raised border-edge text-fg3",                                          icon: MinusCircle  },
-  Unknown:   { badge: "bg-surface-raised border-edge text-fg3",                                          icon: HelpCircle   },
-};
-
 const SOURCE_LABEL: Record<string, string> = {
   linkedin:         "LI",
   indeed:           "IN",
@@ -67,146 +53,61 @@ function relDate(dateStr: string | null): string {
 }
 
 function sortScore(t: TeamSignal): number {
-  if (t.isaVelocity !== "None")      return 3;
-  if (t.isaPresence === "Confirmed") return 2;
-  if (t.isaPresence === "Likely")    return 1;
+  if (t.isaVelocity !== "None")  return 3;
+  if (t.supabaseISAConfirmed)    return 2;
+  if (t.isaPresence === "Likely") return 1;
   return 0;
 }
 
-function presenceKey(value: string): PresenceValue {
-  return (PRESENCE_OPTIONS as readonly string[]).includes(value)
-    ? (value as PresenceValue)
-    : "Unknown";
-}
-
-function cardAccentClasses(t: TeamSignal): string {
-  if (t.isaVelocity !== "None")      return "border-l-4 border-l-primary";
-  if (t.isaPresence === "Confirmed") return "border-l-4 border-l-green-600";
-  if (t.isaPresence === "Likely")    return "border-l-4 border-l-amber-500";
-  return "";
-}
-
-// ── PresencePicker ────────────────────────────────────────────────────────────
-
-function PresencePicker({
-  value,
-  onChange,
-}: {
-  value:    string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref  = useRef<HTMLDivElement>(null);
-  const key  = presenceKey(value);
-  const { badge, icon: Icon } = PRESENCE[key];
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded border transition-opacity hover:opacity-80 ${badge}`}
-      >
-        <Icon size={10} />
-        {value}
-        <ChevronDown size={9} className="opacity-50 ml-0.5" />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-40 bg-surface border border-edge rounded-lg shadow-lg overflow-hidden min-w-[140px]">
-          {PRESENCE_OPTIONS.map((opt) => {
-            const { badge: oBadge, icon: OIcon } = PRESENCE[opt];
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => { onChange(opt); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface-raised transition-colors"
-              >
-                <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${oBadge}`}
-                >
-                  <OIcon size={9} />
-                  {opt}
-                </span>
-                {opt === value && (
-                  <Check size={10} className="ml-auto text-fg2 shrink-0" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+function cardBorderColor(t: TeamSignal): string {
+  if (t.isaVelocity !== "None")  return "#F97316";
+  if (t.supabaseISAConfirmed)    return "#16A34A";
+  if (t.isaPresence === "Likely") return "#FBBF24";
+  return "#E5E3DF";
 }
 
 // ── VelocityBadge ─────────────────────────────────────────────────────────────
 
 function VelocityBadge({ velocity }: { velocity: "Hot" | "Active" | "None" }) {
   if (velocity === "None") return null;
-
-  const isHot = velocity === "Hot";
+  const isHot  = velocity === "Hot";
   const cls    = isHot
     ? "bg-primary-soft border-primary-muted text-primary"
     : "bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success)]";
   const dotCls = isHot ? "bg-primary animate-pulse" : "bg-[var(--success)]";
-  const label  = isHot ? "Scaling Up" : "Hiring";
-
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
-      {label}
+      {isHot ? "Scaling Up" : "Hiring"}
     </span>
   );
 }
 
 // ── StatCard ──────────────────────────────────────────────────────────────────
 
-function StatCard({
-  label, value, accent,
-}: {
-  label:   string;
-  value:   number;
-  accent?: boolean;
+function StatCard({ label, value, accent, explainer }: {
+  label:     string;
+  value:     number;
+  accent?:   boolean;
+  explainer: string;
 }) {
   return (
-    <div
-      className={`rounded-[10px] p-6 border ${
-        accent
-          ? "bg-primary-soft border-primary-muted"
-          : "bg-surface border-edge"
-      }`}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-3">
-        {label}
-      </p>
+    <div className={`rounded-[10px] p-6 border ${accent ? "bg-primary-soft border-primary-muted" : "bg-surface border-edge"}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-3">{label}</p>
       <p
-        className={`text-[32px] font-extrabold leading-none ${accent ? "text-primary" : "text-ink"}`}
+        className={`text-[32px] font-extrabold leading-none mb-2 ${accent ? "text-primary" : "text-ink"}`}
         style={{ letterSpacing: "-0.02em" }}
       >
         {value}
       </p>
+      <p className="text-[11px] text-fg3 leading-snug">{explainer}</p>
     </div>
   );
 }
 
 // ── FilterSelect ──────────────────────────────────────────────────────────────
 
-function FilterSelect({
-  label, value, onChange, options,
-}: {
+function FilterSelect({ label, value, onChange, options }: {
   label:    string;
   value:    string;
   onChange: (v: string) => void;
@@ -214,25 +115,15 @@ function FilterSelect({
 }) {
   const active = !!value;
   return (
-    <div
-      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-colors ${
-        active
-          ? "bg-primary-soft border-primary-muted"
-          : "bg-surface border-edge"
-      }`}
-    >
+    <div className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-colors ${active ? "bg-primary-soft border-primary-muted" : "bg-surface border-edge"}`}>
       <select
-        className={`bg-transparent text-sm outline-none cursor-pointer ${
-          active ? "text-primary" : "text-fg2"
-        }`}
+        className={`bg-transparent text-sm outline-none cursor-pointer ${active ? "text-primary" : "text-fg2"}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">All — {label}</option>
         {options.map((o) => (
-          <option key={o} value={o} className="bg-surface text-ink">
-            {o}
-          </option>
+          <option key={o} value={o} className="bg-surface text-ink">{o}</option>
         ))}
       </select>
     </div>
@@ -241,109 +132,115 @@ function FilterSelect({
 
 // ── TeamCard ──────────────────────────────────────────────────────────────────
 
-function TeamCard({
-  team,
-  onUpdate,
-}: {
-  team:     TeamSignal;
-  onUpdate: (id: number, field: "isaPresence" | "marketingOpsPresence", value: string) => void;
-}) {
+function TeamCard({ team }: { team: TeamSignal }) {
   const siteHref = team.website
-    ? team.website.startsWith("http")
-      ? team.website
-      : `https://${team.website}`
+    ? team.website.startsWith("http") ? team.website : `https://${team.website}`
     : null;
+
+  const hasHiring  = team.isaVelocity !== "None";
+  const borderColor = cardBorderColor(team);
+  const topSignal  = team.liveISASignals[0] ?? null;
 
   return (
     <div
-      className={`bg-surface border border-edge rounded-[10px] p-4 grid grid-cols-[30%_1fr_1fr] ${cardAccentClasses(team)}`}
+      className="bg-surface border border-edge rounded-[10px] overflow-hidden transition-all duration-200"
+      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLDivElement;
+        el.style.borderLeftColor = "#FED7AA";
+        el.style.boxShadow = "0 2px 12px #F9731610";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLDivElement;
+        el.style.borderLeftColor = borderColor;
+        el.style.boxShadow = "";
+      }}
     >
-      {/* ── Left: team info ──────────────────────────────────────────────── */}
-      <div className="pr-4 min-w-0">
-        <p className="text-[15px] font-semibold text-ink leading-snug truncate">
-          {team.name}
-        </p>
-        {team.brokerage && (
-          <p className="text-[13px] text-fg2 truncate mt-0.5">{team.brokerage}</p>
-        )}
-        {team.location && (
-          <p className="text-[13px] text-fg3 mt-0.5">{team.location}</p>
-        )}
-        {siteHref && (
-          <a
-            href={siteHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary-hover transition-colors mt-2"
-          >
-            <ExternalLink size={10} />
-            website
-          </a>
-        )}
+      {/* ROW 1: WHO */}
+      <div className="px-5 pt-4 pb-3 border-b border-edge flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[15px] font-bold text-ink leading-snug truncate">{team.name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {team.brokerage && <span className="text-[13px] text-fg2">{team.brokerage}</span>}
+            {team.brokerage && team.location && <span className="text-fg3 text-[13px]">·</span>}
+            {team.location  && <span className="text-[13px] text-fg3">{team.location}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {hasHiring && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-primary">
+              ⚡ Outreach Now
+            </span>
+          )}
+          {siteHref && (
+            <a
+              href={siteHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] text-fg2 hover:text-ink border border-edge rounded-lg px-2.5 py-1 hover:border-primary-muted transition-colors"
+            >
+              <ExternalLink size={11} />
+              Visit website
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* ── Center: ISA hiring activity (LIVE) ──────────────────────────── */}
-      <div className="border-x border-edge px-4 min-w-0">
-        <div className="mb-2"><LiveLabel /></div>
-        {team.liveISASignals.length === 0 ? (
-          <p className="text-fg3 text-[12px]">No active hiring</p>
-        ) : (
+      {/* ROW 2: LIVE SIGNAL */}
+      <div className="px-5 py-3 border-b border-edge flex items-center gap-3 flex-wrap">
+        <span title="Pulled from live job board scraping">
+          <LiveLabel />
+        </span>
+        {hasHiring ? (
           <>
             <VelocityBadge velocity={team.isaVelocity} />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {team.liveISASignals.slice(0, 4).map((sig) => (
-                <a
-                  key={sig.id}
-                  href={sig.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] bg-surface-raised border border-edge hover:border-primary-muted text-fg2 hover:text-ink px-2 py-0.5 rounded transition-colors"
-                >
-                  <span className="font-semibold text-primary shrink-0">
-                    {SOURCE_LABEL[sig.source] ?? sig.source.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="truncate max-w-[90px]">{sig.normalizedRole}</span>
-                  {sig.postedAt && <span className="text-fg3 shrink-0">{relDate(sig.postedAt)}</span>}
-                  <ExternalLink size={8} className="shrink-0 text-fg3" />
-                </a>
-              ))}
-              {team.liveISASignals.length > 4 && (
-                <span className="text-[11px] text-fg3 px-1 py-0.5">
-                  +{team.liveISASignals.length - 4} more
+            <span className="text-[13px] font-semibold text-ink">
+              {team.liveISASignals.length} ISA {team.liveISASignals.length === 1 ? "role" : "roles"} open
+            </span>
+            {topSignal && (
+              <a
+                href={topSignal.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[12px] text-fg2 hover:text-ink transition-colors"
+              >
+                <span className="font-semibold text-primary text-[11px] px-1.5 py-0.5 bg-primary-soft rounded">
+                  {SOURCE_LABEL[topSignal.source] ?? topSignal.source.slice(0, 2).toUpperCase()}
                 </span>
-              )}
-            </div>
+                <span className="truncate max-w-[180px]">{topSignal.normalizedRole}</span>
+                {topSignal.postedAt && (
+                  <span className="text-fg3 shrink-0">{relDate(topSignal.postedAt)}</span>
+                )}
+                <ExternalLink size={9} className="text-fg3 shrink-0" />
+              </a>
+            )}
+            {team.liveISASignals.length > 1 && (
+              <span className="text-[11px] text-fg3">+{team.liveISASignals.length - 1} more</span>
+            )}
           </>
+        ) : (
+          <span className="text-[13px] text-fg3 italic">No active hiring detected</span>
         )}
       </div>
 
-      {/* ── Right: presence pickers (STATIC) ─────────────────────────────── */}
-      <div className="pl-4 space-y-3">
-        <div>
-          <div className="mb-1.5"><StaticLabel /></div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1">
-            ISA Structure
-          </p>
-          <PresencePicker
-            value={team.isaPresence === "Unknown" && team.supabaseISAConfirmed ? "Confirmed" : team.isaPresence}
-            onChange={(v) => onUpdate(team.id, "isaPresence", v)}
-          />
-          {team.supabaseISAConfirmed && (
-            <p className="text-[11px] text-fg3 mt-1">Based on RealTrends agent data</p>
-          )}
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1">
-            Mktg &amp; Ops
-          </p>
-          <PresencePicker
-            value={team.marketingOpsPresence === "Unknown" && team.supabaseMktgConfirmed ? "Confirmed" : team.marketingOpsPresence}
-            onChange={(v) => onUpdate(team.id, "marketingOpsPresence", v)}
-          />
-          {team.supabaseMktgConfirmed && (
-            <p className="text-[11px] text-fg3 mt-1">Based on RealTrends agent data</p>
-          )}
-        </div>
+      {/* ROW 3: STATIC CONTEXT */}
+      <div className="px-5 py-3 flex items-center gap-3 flex-wrap">
+        <span title="Static data from RealTrends research — not real-time">
+          <StaticLabel />
+        </span>
+        <span className="text-[12px] text-fg3">
+          ISA Structure:
+          <span className={`ml-1 font-semibold ${team.supabaseISAConfirmed ? "text-[#16A34A]" : "text-fg2"}`}>
+            {team.supabaseISAConfirmed ? "Confirmed" : "Unknown"}
+          </span>
+        </span>
+        <span className="text-fg3 text-[12px]">·</span>
+        <span className="text-[12px] text-fg3">
+          Marketing &amp; Ops:
+          <span className={`ml-1 font-semibold ${team.supabaseMktgConfirmed ? "text-[#16A34A]" : "text-fg2"}`}>
+            {team.supabaseMktgConfirmed ? "Confirmed" : "Unknown"}
+          </span>
+        </span>
       </div>
     </div>
   );
@@ -360,10 +257,6 @@ export function SignalsClient() {
   const [filterISA,      setFilterISA]      = useState("");
   const [filterVelocity, setFilterVelocity] = useState("");
   const [filterMktg,     setFilterMktg]     = useState("");
-
-  const [detecting,      setDetecting]      = useState(false);
-  const [detectProgress, setDetectProgress] = useState(0);
-  const [detectTotal,    setDetectTotal]    = useState(0);
 
   const loadSignals = useCallback(async () => {
     setLoading(true);
@@ -403,14 +296,8 @@ export function SignalsClient() {
       toast("All teams already have presence signals set.", "info");
       return;
     }
-
-    setDetecting(true);
-    setDetectProgress(0);
-    setDetectTotal(unknowns.length);
-
     let updated = 0;
     const BATCH = 5;
-
     for (let i = 0; i < unknowns.length; i += BATCH) {
       const batch = unknowns.slice(i, i + BATCH);
       try {
@@ -418,9 +305,7 @@ export function SignalsClient() {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
-            teams: batch.map((t) => ({
-              id: t.id, name: t.name, brokerage: t.brokerage, location: t.location,
-            })),
+            teams: batch.map((t) => ({ id: t.id, name: t.name, brokerage: t.brokerage, location: t.location })),
           }),
         });
         if (res.ok) {
@@ -431,27 +316,29 @@ export function SignalsClient() {
           setTeams((prev) =>
             prev.map((t) => {
               const s = byId.get(t.id);
-              return s
-                ? { ...t, isaPresence: s.isaPresence, marketingOpsPresence: s.marketingOpsPresence }
-                : t;
+              return s ? { ...t, isaPresence: s.isaPresence, marketingOpsPresence: s.marketingOpsPresence } : t;
             })
           );
           updated += saved.length;
         }
       } catch { /* continue batch */ }
-      setDetectProgress(Math.min(i + BATCH, unknowns.length));
     }
-
-    setDetecting(false);
     toast(`Auto-detected presence signals for ${updated} teams.`, "success");
   }
 
+  // suppress lint — functions kept for future use
+  void updatePresence;
+  void runAutoDetect;
+
   const filtered = teams
     .filter((t) => {
-      if (search         && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (filterISA      && t.isaPresence          !== filterISA)      return false;
-      if (filterMktg     && t.marketingOpsPresence !== filterMktg)     return false;
-      if (filterVelocity && t.isaVelocity          !== filterVelocity) return false;
+      if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterISA === "Confirmed" && !t.supabaseISAConfirmed)  return false;
+      if (filterISA === "Unknown"   &&  t.supabaseISAConfirmed)  return false;
+      if (filterVelocity === "Actively Hiring" && t.isaVelocity === "None") return false;
+      if (filterVelocity === "Not Hiring"      && t.isaVelocity !== "None") return false;
+      if (filterMktg === "Confirmed" && !t.supabaseMktgConfirmed) return false;
+      if (filterMktg === "Unknown"   &&  t.supabaseMktgConfirmed) return false;
       return true;
     })
     .sort((a, b) => sortScore(b) - sortScore(a));
@@ -459,10 +346,10 @@ export function SignalsClient() {
   const hasFilter = !!(search || filterISA || filterMktg || filterVelocity);
 
   const stats = {
-    isaConfirmed:  teams.filter((t) => t.isaPresence          === "Confirmed").length,
-    activeHiring:  teams.filter((t) => t.isaVelocity          !== "None").length,
-    mktgConfirmed: teams.filter((t) => t.marketingOpsPresence === "Confirmed").length,
-    total:         teams.length,
+    isaPresence:  teams.filter((t) => t.supabaseISAConfirmed).length,
+    activeHiring: teams.filter((t) => t.isaVelocity !== "None").length,
+    mktgPresence: teams.filter((t) => t.supabaseMktgConfirmed).length,
+    total:        teams.length,
   };
 
   function clearFilters() {
@@ -473,40 +360,41 @@ export function SignalsClient() {
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
 
       {/* Page header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <Zap size={20} className="text-primary" />
-            <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: "-0.01em" }}>
-              Team Signals
-            </h1>
-          </div>
-          <p className="text-sm text-fg2">
-            Live hiring intelligence across your target accounts
-          </p>
+      <div className="mb-8">
+        <div className="flex items-center gap-2.5 mb-1">
+          <Zap size={20} className="text-primary" />
+          <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: "-0.01em" }}>
+            Team Signals
+          </h1>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <button
-            type="button"
-            onClick={runAutoDetect}
-            disabled={detecting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <Sparkles size={14} />
-            {detecting
-              ? `Analyzing ${detectProgress} / ${detectTotal}…`
-              : "Auto-detect Signals"}
-          </button>
-          <span className="text-xs text-fg3">AI estimates — verify manually</span>
-        </div>
+        <p className="text-sm text-fg2">
+          See which of your 95 target accounts are actively hiring ISA roles right now — and which already have an ISA or Marketing team in place.
+        </p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="ISA Presence Confirmed"    value={stats.isaConfirmed}  />
-        <StatCard label="Actively Hiring ISA Roles" value={stats.activeHiring}  accent />
-        <StatCard label="Mktg / Ops Confirmed"      value={stats.mktgConfirmed} />
-        <StatCard label="Target Accounts Tracked"   value={stats.total}         />
+        <StatCard
+          label="ISA Presence"
+          value={stats.isaPresence}
+          explainer="Teams known to already have an ISA structure"
+        />
+        <StatCard
+          label="Actively Hiring ISA"
+          value={stats.activeHiring}
+          accent
+          explainer="Teams posting ISA roles on job boards right now"
+        />
+        <StatCard
+          label="Marketing & Ops Presence"
+          value={stats.mktgPresence}
+          explainer="Teams with a dedicated marketing or ops person"
+        />
+        <StatCard
+          label="Target Accounts"
+          value={stats.total}
+          explainer="Teams on Fello's priority outreach list"
+        />
       </div>
 
       {/* Filter bar */}
@@ -531,19 +419,19 @@ export function SignalsClient() {
             label="ISA Presence"
             value={filterISA}
             onChange={setFilterISA}
-            options={["Confirmed", "Likely", "None", "Unknown"]}
+            options={["Confirmed", "Unknown"]}
           />
           <FilterSelect
             label="ISA Hiring"
             value={filterVelocity}
             onChange={setFilterVelocity}
-            options={["Hot", "Active", "None"]}
+            options={["Actively Hiring", "Not Hiring"]}
           />
           <FilterSelect
-            label="Mktg / Ops"
+            label="Marketing & Ops"
             value={filterMktg}
             onChange={setFilterMktg}
-            options={["Confirmed", "Likely", "None", "Unknown"]}
+            options={["Confirmed", "Unknown"]}
           />
           {hasFilter && (
             <button
@@ -564,20 +452,20 @@ export function SignalsClient() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface border border-edge rounded-[10px] p-4 grid grid-cols-[30%_1fr_1fr]"
-            >
-              {[0, 1, 2].map((col) => (
-                <div
-                  key={col}
-                  className={`${col === 0 ? "pr-4" : "px-4"} ${col === 1 ? "border-x border-edge" : ""}`}
-                >
-                  <Skeleton className="h-4 w-32 mb-2" />
-                  <Skeleton className="h-3 w-24 mb-1.5" />
-                  <Skeleton className="h-3 w-16" />
+            <div key={i} className="bg-surface border border-edge rounded-[10px] overflow-hidden" style={{ borderLeftWidth: 4, borderLeftColor: "#E5E3DF" }}>
+              <div className="px-5 pt-4 pb-3 border-b border-edge flex justify-between">
+                <div>
+                  <Skeleton className="h-4 w-44 mb-2" />
+                  <Skeleton className="h-3 w-32" />
                 </div>
-              ))}
+                <Skeleton className="h-7 w-24" />
+              </div>
+              <div className="px-5 py-3 border-b border-edge">
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+              <div className="px-5 py-3">
+                <Skeleton className="h-3 w-1/2" />
+              </div>
             </div>
           ))}
         </div>
@@ -596,11 +484,22 @@ export function SignalsClient() {
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((team) => (
-            <TeamCard key={team.id} team={team} onUpdate={updatePresence} />
-          ))}
-        </div>
+        <>
+          {/* Section divider */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px bg-edge" />
+            <span className="text-[11px] text-fg3 whitespace-nowrap">
+              Sorted by signal strength — highest priority first
+            </span>
+            <div className="flex-1 h-px bg-edge" />
+          </div>
+
+          <div className="space-y-3">
+            {filtered.map((team) => (
+              <TeamCard key={team.id} team={team} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
