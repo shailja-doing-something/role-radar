@@ -38,10 +38,10 @@ const PRESENCE_OPTIONS = ["Confirmed", "Likely", "None", "Unknown"] as const;
 type PresenceValue = (typeof PRESENCE_OPTIONS)[number];
 
 const PRESENCE: Record<PresenceValue, { badge: string; icon: React.ElementType }> = {
-  Confirmed: { badge: "bg-green-500/10 border-green-500/30 text-green-400",  icon: CheckCircle2 },
-  Likely:    { badge: "bg-amber-500/10 border-amber-500/30 text-amber-400",  icon: AlertCircle  },
-  None:      { badge: "bg-surface-raised border-edge text-fg3",              icon: MinusCircle  },
-  Unknown:   { badge: "border-edge text-fg3",                                icon: HelpCircle   },
+  Confirmed: { badge: "bg-green-50 border-green-200 text-green-700",   icon: CheckCircle2 },
+  Likely:    { badge: "bg-amber-50 border-amber-200 text-amber-700",   icon: AlertCircle  },
+  None:      { badge: "bg-surface-raised border-edge text-fg3",        icon: MinusCircle  },
+  Unknown:   { badge: "bg-surface-raised border-edge text-fg3",        icon: HelpCircle   },
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -77,13 +77,13 @@ function presenceKey(value: string): PresenceValue {
 }
 
 function cardAccentClasses(t: TeamSignal): string {
-  if (t.isaVelocity !== "None")      return "border-l-4 border-l-indigo-500";
-  if (t.isaPresence === "Confirmed") return "border-l-4 border-l-green-500";
+  if (t.isaVelocity !== "None")      return "border-l-4 border-l-primary";
+  if (t.isaPresence === "Confirmed") return "border-l-4 border-l-green-600";
   if (t.isaPresence === "Likely")    return "border-l-4 border-l-amber-500";
   return "";
 }
 
-// ── PresencePicker ─────────────────────────────────────────────────────────────
+// ── PresencePicker ────────────────────────────────────────────────────────────
 
 function PresencePicker({
   value,
@@ -119,7 +119,7 @@ function PresencePicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-40 bg-surface-raised border border-edge rounded-lg shadow-2xl overflow-hidden min-w-[140px]">
+        <div className="absolute left-0 top-full mt-1.5 z-40 bg-surface border border-edge rounded-lg shadow-lg overflow-hidden min-w-[140px]">
           {PRESENCE_OPTIONS.map((opt) => {
             const { badge: oBadge, icon: OIcon } = PRESENCE[opt];
             return (
@@ -127,7 +127,7 @@ function PresencePicker({
                 key={opt}
                 type="button"
                 onClick={() => { onChange(opt); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface-raised transition-colors"
               >
                 <span
                   className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${oBadge}`}
@@ -151,16 +151,20 @@ function PresencePicker({
 
 function VelocityBadge({ velocity }: { velocity: "Hot" | "Active" | "None" }) {
   if (velocity === "None") return null;
-  const cls    = velocity === "Hot"
-    ? "bg-red-500/10 border-red-500/30 text-red-400"
-    : "bg-amber-500/10 border-amber-500/30 text-amber-400";
-  const dotCls = velocity === "Hot" ? "bg-red-400 animate-pulse" : "bg-amber-400";
+
+  const isHot = velocity === "Hot";
+  const cls    = isHot
+    ? "bg-primary-soft border-primary-muted text-primary"
+    : "bg-green-50 border-green-200 text-green-700";
+  const dotCls = isHot ? "bg-primary animate-pulse" : "bg-green-600";
+  const label  = isHot ? "Scaling Up" : "Hiring";
+
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border ${cls}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
-      {velocity} Hiring
+      {label}
     </span>
   );
 }
@@ -176,16 +180,19 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-xl p-6 border ${
+      className={`rounded-[10px] p-6 border ${
         accent
-          ? "bg-indigo-500/5 border-indigo-500/30"
+          ? "bg-primary-soft border-primary-muted"
           : "bg-surface border-edge"
       }`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2 mb-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-3">
         {label}
       </p>
-      <p className={`text-[32px] font-bold leading-none ${accent ? "text-indigo-400" : "text-white"}`}>
+      <p
+        className={`text-[32px] font-extrabold leading-none ${accent ? "text-primary" : "text-ink"}`}
+        style={{ letterSpacing: "-0.02em" }}
+      >
         {value}
       </p>
     </div>
@@ -207,20 +214,20 @@ function FilterSelect({
     <div
       className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-colors ${
         active
-          ? "bg-indigo-500/10 border-indigo-500/30"
+          ? "bg-primary-soft border-primary-muted"
           : "bg-surface border-edge"
       }`}
     >
       <select
         className={`bg-transparent text-sm outline-none cursor-pointer ${
-          active ? "text-indigo-300" : "text-fg2"
+          active ? "text-primary" : "text-fg2"
         }`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">All — {label}</option>
         {options.map((o) => (
-          <option key={o} value={o} className="bg-surface-raised text-white">
+          <option key={o} value={o} className="bg-surface text-ink">
             {o}
           </option>
         ))}
@@ -246,25 +253,25 @@ function TeamCard({
 
   return (
     <div
-      className={`bg-surface border border-edge rounded-xl p-4 grid grid-cols-[30%_1fr_1fr] ${cardAccentClasses(team)}`}
+      className={`bg-surface border border-edge rounded-[10px] p-4 grid grid-cols-[30%_1fr_1fr] ${cardAccentClasses(team)}`}
     >
       {/* ── Left: team info ──────────────────────────────────────────────── */}
       <div className="pr-4 min-w-0">
-        <p className="text-[15px] font-semibold text-white leading-snug truncate">
+        <p className="text-[15px] font-semibold text-ink leading-snug truncate">
           {team.name}
         </p>
         {team.brokerage && (
-          <p className="text-xs text-fg2 truncate mt-0.5">{team.brokerage}</p>
+          <p className="text-[13px] text-fg2 truncate mt-0.5">{team.brokerage}</p>
         )}
         {team.location && (
-          <p className="text-xs text-fg3 mt-0.5">{team.location}</p>
+          <p className="text-[13px] text-fg3 mt-0.5">{team.location}</p>
         )}
         {siteHref && (
           <a
             href={siteHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors mt-2"
+            className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary-hover transition-colors mt-2"
           >
             <ExternalLink size={10} />
             website
@@ -286,9 +293,9 @@ function TeamCard({
                   href={sig.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] bg-surface-raised border border-edge hover:border-indigo-500/40 text-fg2 hover:text-white px-2 py-0.5 rounded transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] bg-surface-raised border border-edge hover:border-primary-muted text-fg2 hover:text-ink px-2 py-0.5 rounded transition-colors"
                 >
-                  <span className="font-semibold text-indigo-400 shrink-0">
+                  <span className="font-semibold text-primary shrink-0">
                     {SOURCE_LABEL[sig.source] ?? sig.source.slice(0, 2).toUpperCase()}
                   </span>
                   <span className="truncate max-w-[90px]">{sig.normalizedRole}</span>
@@ -351,7 +358,6 @@ export function SignalsClient() {
   const [detectProgress, setDetectProgress] = useState(0);
   const [detectTotal,    setDetectTotal]    = useState(0);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
   const loadSignals = useCallback(async () => {
     setLoading(true);
     try {
@@ -365,7 +371,6 @@ export function SignalsClient() {
 
   useEffect(() => { loadSignals(); }, [loadSignals]);
 
-  // ── Optimistic update ─────────────────────────────────────────────────────
   async function updatePresence(
     id:    number,
     field: "isaPresence" | "marketingOpsPresence",
@@ -383,7 +388,6 @@ export function SignalsClient() {
     }
   }
 
-  // ── Auto-detect ───────────────────────────────────────────────────────────
   async function runAutoDetect() {
     const unknowns = teams.filter(
       (t) => t.isaPresence === "Unknown" || t.marketingOpsPresence === "Unknown"
@@ -435,7 +439,6 @@ export function SignalsClient() {
     toast(`Auto-detected presence signals for ${updated} teams.`, "success");
   }
 
-  // ── Filter + sort ─────────────────────────────────────────────────────────
   const filtered = teams
     .filter((t) => {
       if (search         && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -459,7 +462,6 @@ export function SignalsClient() {
     setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg("");
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
 
@@ -467,8 +469,10 @@ export function SignalsClient() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <Zap size={20} className="text-indigo-400" />
-            <h1 className="text-2xl font-semibold text-white">Team Signals</h1>
+            <Zap size={20} className="text-primary" />
+            <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: "-0.01em" }}>
+              Team Signals
+            </h1>
           </div>
           <p className="text-sm text-fg2">
             Live hiring intelligence across your Top 100 target accounts
@@ -479,7 +483,7 @@ export function SignalsClient() {
             type="button"
             onClick={runAutoDetect}
             disabled={detecting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <Sparkles size={14} />
             {detecting
@@ -503,7 +507,7 @@ export function SignalsClient() {
         <div className="flex items-center gap-2 bg-surface border border-edge rounded-lg px-3 py-2.5">
           <Search size={14} className="text-fg3 shrink-0" />
           <input
-            className="bg-transparent text-white text-sm placeholder-fg3 outline-none flex-1"
+            className="bg-transparent text-ink text-sm placeholder-fg3 outline-none flex-1"
             placeholder="Search teams…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -538,7 +542,7 @@ export function SignalsClient() {
             <button
               type="button"
               onClick={clearFilters}
-              className="text-xs text-fg2 hover:text-white px-3 py-1.5 rounded-lg hover:bg-surface-raised transition-colors"
+              className="text-xs text-fg2 hover:text-ink px-3 py-1.5 rounded-lg hover:bg-surface-raised transition-colors"
             >
               Clear filters
             </button>
@@ -555,7 +559,7 @@ export function SignalsClient() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="bg-surface border border-edge rounded-xl p-4 grid grid-cols-[30%_1fr_1fr]"
+              className="bg-surface border border-edge rounded-[10px] p-4 grid grid-cols-[30%_1fr_1fr]"
             >
               {[0, 1, 2].map((col) => (
                 <div
@@ -571,13 +575,14 @@ export function SignalsClient() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-surface border border-edge rounded-xl py-16 text-center">
-          <p className="text-fg2 text-sm mb-3">No teams match your filters.</p>
+        <div className="bg-surface border border-edge rounded-[10px] py-16 text-center">
+          <p className="text-fg2 text-sm mb-1">No signals detected.</p>
+          <p className="text-fg3 text-[13px] mb-4">Run a scrape to light this up.</p>
           {hasFilter && (
             <button
               type="button"
               onClick={clearFilters}
-              className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+              className="text-primary hover:text-primary-hover text-sm transition-colors"
             >
               Clear filters
             </button>
