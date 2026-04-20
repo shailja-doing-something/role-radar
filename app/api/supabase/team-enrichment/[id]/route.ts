@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readonlyQuery } from "@/lib/supabase-readonly";
-import { getRealTrendsTeam } from "@/lib/supabase-data";
+import { getRealTrendsTeams } from "@/lib/supabase-data";
 
 export const revalidate = 86400;
 
@@ -24,22 +24,23 @@ export async function GET(
     return NextResponse.json({ matched: false });
   }
 
-  const [realTrends, isaRows, mktgRows] = await Promise.all([
-    getRealTrendsTeam(team.supabaseTeamId),
+  const sid = team.supabaseTeamId;
+  const [rtMap, isaRows, mktgRows] = await Promise.all([
+    getRealTrendsTeams([sid]),
     readonlyQuery<{ isa_agent_count: number | null; isa_categories: string[] | null }>(
       `SELECT isa_agent_count, isa_categories FROM mad.isa_teams WHERE team_id = $1`,
-      [team.supabaseTeamId]
+      [sid]
     ).catch(() => []),
     readonlyQuery<{ dept_agent_count: number | null; departments: string[] | null }>(
       `SELECT dept_agent_count, departments FROM mad.marketing_ops_teams WHERE team_id = $1`,
-      [team.supabaseTeamId]
+      [sid]
     ).catch(() => []),
   ]);
 
   return NextResponse.json({
-    matched: true,
-    realTrends: realTrends ?? null,
-    isa: isaRows[0] ?? null,
-    marketingOps: mktgRows[0] ?? null,
+    matched:     true,
+    realTrends:  rtMap.get(sid) ?? null,
+    isa:         isaRows[0]     ?? null,
+    marketingOps: mktgRows[0]  ?? null,
   });
 }

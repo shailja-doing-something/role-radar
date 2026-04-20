@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LiveLabel, StaticLabel } from "@/components/source-labels";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -281,10 +282,11 @@ function TeamCard({
         )}
       </div>
 
-      {/* ── Center: ISA hiring activity ──────────────────────────────────── */}
+      {/* ── Center: ISA hiring activity (LIVE) ──────────────────────────── */}
       <div className="border-x border-edge px-4 min-w-0">
+        <div className="mb-2"><LiveLabel /></div>
         {team.liveISASignals.length === 0 ? (
-          <p className="text-fg3 text-sm">No active hiring</p>
+          <p className="text-fg3 text-[12px]">No active hiring</p>
         ) : (
           <>
             <VelocityBadge velocity={team.isaVelocity} />
@@ -301,6 +303,7 @@ function TeamCard({
                     {SOURCE_LABEL[sig.source] ?? sig.source.slice(0, 2).toUpperCase()}
                   </span>
                   <span className="truncate max-w-[90px]">{sig.normalizedRole}</span>
+                  {sig.postedAt && <span className="text-fg3 shrink-0">{relDate(sig.postedAt)}</span>}
                   <ExternalLink size={8} className="shrink-0 text-fg3" />
                 </a>
               ))}
@@ -310,19 +313,15 @@ function TeamCard({
                 </span>
               )}
             </div>
-            {team.liveISASignals[0]?.postedAt && (
-              <p className="text-[11px] text-fg3 mt-2">
-                Last: {relDate(team.liveISASignals[0].postedAt)}
-              </p>
-            )}
           </>
         )}
       </div>
 
-      {/* ── Right: presence pickers ──────────────────────────────────────── */}
+      {/* ── Right: presence pickers (STATIC) ─────────────────────────────── */}
       <div className="pl-4 space-y-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1.5">
+          <div className="mb-1.5"><StaticLabel /></div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1">
             ISA Structure
           </p>
           <PresencePicker
@@ -330,11 +329,11 @@ function TeamCard({
             onChange={(v) => onUpdate(team.id, "isaPresence", v)}
           />
           {team.supabaseISAConfirmed && (
-            <p className="text-[11px] text-fg3 mt-1">RealTrends data</p>
+            <p className="text-[11px] text-fg3 mt-1">Based on RealTrends agent data</p>
           )}
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1">
             Mktg &amp; Ops
           </p>
           <PresencePicker
@@ -342,7 +341,7 @@ function TeamCard({
             onChange={(v) => onUpdate(team.id, "marketingOpsPresence", v)}
           />
           {team.supabaseMktgConfirmed && (
-            <p className="text-[11px] text-fg3 mt-1">RealTrends data</p>
+            <p className="text-[11px] text-fg3 mt-1">Based on RealTrends agent data</p>
           )}
         </div>
       </div>

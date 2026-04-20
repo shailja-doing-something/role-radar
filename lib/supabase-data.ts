@@ -31,6 +31,7 @@ export interface MarketingOpsTeam {
 }
 
 export interface RealTrendsTeam {
+  team_id: string;
   rank: number | null;
   annual_revenue: string | null;
   sides: number | null;
@@ -45,50 +46,66 @@ export interface SupabaseTeamMatch {
   website_url: string | null;
 }
 
+// ── Module-level cache (static data, 1-hour TTL) ──────────────────────────────
+
+interface CacheEntry<T> { data: T; ts: number }
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+let isaCache:  CacheEntry<ISATeam[]>          | null = null;
+let mktgCache: CacheEntry<MarketingOpsTeam[]> | null = null;
+
 export async function getISATeams(): Promise<ISATeam[]> {
+  if (isaCache && Date.now() - isaCache.ts < CACHE_TTL) return isaCache.data;
   try {
-    return await readonlyQuery<ISATeam>(`
+    const data = await readonlyQuery<ISATeam>(`
       SELECT team_id, team_name, city, state, brokerage, team_size, rank,
              annual_revenue, sides, website_url, isa_agent_count, isa_categories
       FROM mad.isa_teams
       ORDER BY rank ASC NULLS LAST
     `);
+    isaCache = { data, ts: Date.now() };
+    return data;
   } catch (err) {
     console.error("[supabase-data] getISATeams error:", err);
-    return [];
+    return isaCache?.data ?? [];
   }
 }
 
 export async function getMarketingOpsTeams(): Promise<MarketingOpsTeam[]> {
+  if (mktgCache && Date.now() - mktgCache.ts < CACHE_TTL) return mktgCache.data;
   try {
-    return await readonlyQuery<MarketingOpsTeam>(`
+    const data = await readonlyQuery<MarketingOpsTeam>(`
       SELECT team_id, team_name, city, state, brokerage, team_size, rank,
              annual_revenue, sides, website_url, dept_agent_count, departments
       FROM mad.marketing_ops_teams
       ORDER BY rank ASC NULLS LAST
     `);
+    mktgCache = { data, ts: Date.now() };
+    return data;
   } catch (err) {
     console.error("[supabase-data] getMarketingOpsTeams error:", err);
-    return [];
+    return mktgCache?.data ?? [];
   }
 }
 
-export async function getRealTrendsTeam(teamId: string): Promise<RealTrendsTeam | null> {
+// Single batch query — replaces N individual getRealTrendsTeam calls
+export async function getRealTrendsTeams(teamIds: string[]): Promise<Map<string, RealTrendsTeam>> {
+  if (teamIds.length === 0) return new Map();
   try {
     const rows = await readonlyQuery<RealTrendsTeam>(`
-      SELECT rt.rank, rt.annual_revenue, rt.sides, rt.real_trends_url
-      FROM mad.real_trends_teams rt
-      WHERE rt.team_id = $1
-      LIMIT 1
-    `, [teamId]);
-    return rows[0] ?? null;
+      SELECT team_id, rank, annual_revenue, sides, real_trends_url
+      FROM mad.real_trends_teams
+      WHERE team_id = ANY($1::uuid[])
+    `, [teamIds]);
+    return new Map(rows.map((r) => [r.team_id, r]));
   } catch (err) {
-    console.error("[supabase-data] getRealTrendsTeam error:", err);
-    return null;
+    console.error("[supabase-data] getRealTrendsTeams error:", err);
+    return new Map();
   }
 }
 
-// Strip noise words, punctuation, and whitespace for fuzzy matching
+// ── Team matching ─────────────────────────────────────────────────────────────
+
 function normalizeTeamName(name: string): string {
   return name
     .toLowerCase()
@@ -98,7 +115,6 @@ function normalizeTeamName(name: string): string {
     .trim();
 }
 
-// Extract the most distinctive 1–2 word token from a normalized name
 function coreToken(normalized: string): string {
   const words = normalized.split(" ").filter((w) => w.length > 2);
   return words.slice(0, 2).join(" ");
@@ -109,7 +125,6 @@ export async function matchSupabaseTeam(roleRadarTeamName: string): Promise<Supa
     const normalized = normalizeTeamName(roleRadarTeamName);
     const core       = coreToken(normalized);
 
-    // Try exact normalized substring match first (most precise)
     if (core) {
       const rows = await readonlyQuery<SupabaseTeamMatch>(`
         SELECT id, team_name, city, state, website_url
@@ -120,7 +135,6 @@ export async function matchSupabaseTeam(roleRadarTeamName: string): Promise<Supa
       if (rows[0]) return rows[0];
     }
 
-    // Fallback: use pg_trgm similarity for fuzzy matching
     const rows = await readonlyQuery<SupabaseTeamMatch & { sim: number }>(`
       SELECT id, team_name, city, state, website_url,
              similarity(lower(team_name), $1) AS sim

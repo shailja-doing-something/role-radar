@@ -23,7 +23,7 @@ async function probeRegion(
   const pool = new Pool({
     host: ip, port: 5432, user, password, database,
     ssl: { rejectUnauthorized: false },
-    max: 3, connectionTimeoutMillis: 8000,
+    max: 10, connectionTimeoutMillis: 8000,
   });
   const client = await pool.connect(); // throws if wrong region / auth fails
   await client.query("SELECT 1");
@@ -44,7 +44,7 @@ async function buildPool(): Promise<Pool> {
     const [ip] = await resolve4(hostname);
     const pool = new Pool({
       host: ip, port: 5432, user: "postgres", password, database,
-      ssl: { rejectUnauthorized: false }, max: 3,
+      ssl: { rejectUnauthorized: false }, max: 10,
     });
     const client = await pool.connect();
     await client.query("SELECT 1");
@@ -74,7 +74,7 @@ async function buildPool(): Promise<Pool> {
     // Last resort: return a pool using the raw hostname (will error at query time)
     return new Pool({
       host: hostname, port: 5432, user: "postgres", password, database,
-      ssl: { rejectUnauthorized: false }, max: 3,
+      ssl: { rejectUnauthorized: false }, max: 10,
     });
   }
 }

@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { Trophy } from "lucide-react";
 import { Top100Client } from "./top100-client";
-import { getISATeams, getMarketingOpsTeams, getRealTrendsTeam } from "@/lib/supabase-data";
+import { getISATeams, getMarketingOpsTeams, getRealTrendsTeams } from "@/lib/supabase-data";
 import type { Metadata } from "next";
 
+export const dynamic  = "force-dynamic";
 export const metadata: Metadata = { title: "Target Accounts — RoleRadar" };
 
 export default async function Top100Page() {
@@ -21,20 +22,29 @@ export default async function Top100Page() {
     getMarketingOpsTeams(),
   ]);
 
+  // Latest active role title per company (for Section A LIVE data)
+  const latestTitleRows = await prisma.jobPosting.findMany({
+    where:    { isTop100: true, isActive: true },
+    orderBy:  { createdAt: "desc" },
+    distinct: ["company"],
+    select:   { company: true, title: true },
+  });
+  const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company.toLowerCase(), p.title]));
+
   const countMap  = new Map(postingCounts.map((p) => [p.company.toLowerCase(), p._count.company]));
   const isaMap    = new Map(isaTeams.map((t) => [t.team_id, t]));
   const mktgMap   = new Map(mktgTeams.map((t) => [t.team_id, t]));
 
-  // Fetch RealTrends for all matched teams in parallel
-  const matchedIds = [...new Set(teamsRaw.map((t) => t.supabaseTeamId).filter(Boolean))] as string[];
-  const rtResults  = await Promise.all(matchedIds.map((id) => getRealTrendsTeam(id)));
-  const rtMap      = new Map(matchedIds.map((id, i) => [id, rtResults[i]]));
+  // Single batch query for all RealTrends data
+  const matchedIds = teamsRaw.map((t) => t.supabaseTeamId).filter(Boolean) as string[];
+  const rtMap      = await getRealTrendsTeams(matchedIds);
 
   const teams = teamsRaw.map((t) => ({
     ...t,
-    createdAt:  t.createdAt.toISOString(),
-    roleCount:  countMap.get(t.name.toLowerCase()) ?? 0,
-    enrichment: t.supabaseTeamId
+    createdAt:   t.createdAt.toISOString(),
+    roleCount:   countMap.get(t.name.toLowerCase()) ?? 0,
+    latestTitle: latestTitleMap.get(t.name.toLowerCase()) ?? null,
+    enrichment:  t.supabaseTeamId
       ? {
           isa:          isaMap.get(t.supabaseTeamId)  ?? null,
           marketingOps: mktgMap.get(t.supabaseTeamId) ?? null,

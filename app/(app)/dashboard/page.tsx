@@ -7,6 +7,9 @@ import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
 import { getISATeams } from "@/lib/supabase-data";
+import { LiveLabel, StaticLabel } from "@/components/source-labels";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -178,8 +181,12 @@ export default async function DashboardPage() {
             Market Snapshot
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
 
+        {/* LIVE insights */}
+        <div className="flex items-center gap-2 mb-2">
+          <LiveLabel />
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
           {topRole ? (
             <InsightPill dotColor="#F97316">
               Most hired role is{" "}
@@ -219,17 +226,20 @@ export default async function DashboardPage() {
             </span>
             {" "}market average of 30%
           </InsightPill>
-
         </div>
 
-        {/* 5th pill — full width */}
-        <div className="mt-3">
-          <InsightPill dotColor="#16A34A">
-            <span className="text-ink font-semibold">{confirmedISAStructure}</span>
-            {" "}of your target accounts have a confirmed ISA structure per RealTrends data
-          </InsightPill>
-        </div>
-
+        {/* STATIC insight — RealTrends */}
+        {confirmedISAStructure > 0 && (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <StaticLabel />
+            </div>
+            <InsightPill dotColor="#16A34A">
+              <span className="text-ink font-semibold">{confirmedISAStructure}</span>
+              {" "}of your target accounts have a confirmed ISA structure — per RealTrends data
+            </InsightPill>
+          </>
+        )}
       </div>
 
       {/* ── ROW 3: Two columns ──────────────────────────────────────────────── */}
