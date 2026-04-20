@@ -16,14 +16,14 @@ interface Props {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function TrendIcon({ trend }: { trend: string }) {
-  if (trend === "rising")    return <TrendingUp   size={13} className="text-green-400 shrink-0" />;
-  if (trend === "declining") return <TrendingDown size={13} className="text-red-400 shrink-0" />;
+  if (trend === "rising")    return <TrendingUp   size={13} className="text-green-600 shrink-0" />;
+  if (trend === "declining") return <TrendingDown size={13} className="text-red-600 shrink-0" />;
   return                            <Minus        size={13} className="text-fg3 shrink-0" />;
 }
 
 function trendClass(trend: string) {
-  if (trend === "rising")    return "text-green-400";
-  if (trend === "declining") return "text-red-400";
+  if (trend === "rising")    return "text-green-600";
+  if (trend === "declining") return "text-red-600";
   return "text-fg3";
 }
 
@@ -31,7 +31,7 @@ function SectionHeader({
   icon: Icon,
   label,
   sub,
-  color = "text-indigo-400",
+  color = "text-primary",
 }: {
   icon:   React.ElementType;
   label:  string;
@@ -72,13 +72,13 @@ export function PatternsClient({ analysis, createdAt }: Props) {
       {summary && (
         <section className="bg-surface border border-edge rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={14} className="text-indigo-400" />
+            <Sparkles size={14} className="text-primary" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg2">
               AI Analysis
             </span>
             <span className="ml-auto text-xs text-fg3">{lastRun}</span>
           </div>
-          <p className="text-white text-sm leading-relaxed">{summary}</p>
+          <p className="text-ink text-sm leading-relaxed">{summary}</p>
         </section>
       )}
 
@@ -113,10 +113,10 @@ export function PatternsClient({ analysis, createdAt }: Props) {
                         onClick={() => setExpandedRole(expanded ? null : r.role)}
                         className="w-full grid grid-cols-[1fr_40px_48px_80px_16px] items-center px-4 py-3 hover:bg-surface-raised transition-colors text-left"
                       >
-                        <span className="text-sm text-white font-medium truncate pr-2">
+                        <span className="text-sm text-ink font-medium truncate pr-2">
                           {r.role}
                         </span>
-                        <span className="text-sm text-white font-medium tabular-nums text-right">
+                        <span className="text-sm text-ink font-medium tabular-nums text-right">
                           {r.count}
                         </span>
                         <span className="text-xs text-fg2 tabular-nums text-right">
@@ -188,7 +188,7 @@ export function PatternsClient({ analysis, createdAt }: Props) {
 
         {/* Right: Emerging Signals */}
         <div>
-          <SectionHeader icon={Zap} label="Emerging Signals" color="text-amber-400" />
+          <SectionHeader icon={Zap} label="Emerging Signals" color="text-amber-500" />
           {emergingSignals.length === 0 ? (
             <div className="bg-surface border border-edge rounded-xl py-8 text-center">
               <p className="text-fg3 text-sm">No signals yet</p>
@@ -200,7 +200,7 @@ export function PatternsClient({ analysis, createdAt }: Props) {
                   key={i}
                   className="bg-surface border border-edge border-l-4 border-l-amber-500 rounded-xl p-4"
                 >
-                  <p className="text-white text-sm font-semibold leading-snug">{sig.signal}</p>
+                  <p className="text-ink text-sm font-semibold leading-snug">{sig.signal}</p>
                   <p className="text-fg2 text-xs mt-1.5 leading-relaxed">{sig.implication}</p>
                 </div>
               ))}
@@ -221,9 +221,9 @@ export function PatternsClient({ analysis, createdAt }: Props) {
             {felloOpportunities.map((opp, i) => (
               <div
                 key={i}
-                className="bg-surface border border-edge border-l-4 border-l-indigo-500 rounded-xl p-4"
+                className="bg-surface border border-edge border-l-4 border-l-primary rounded-xl p-4"
               >
-                <p className="text-white text-sm font-semibold leading-snug mb-2">
+                <p className="text-ink text-sm font-semibold leading-snug mb-2">
                   {opp.opportunity}
                 </p>
                 <p className="text-fg2 text-xs leading-relaxed">{opp.reason}</p>
@@ -244,8 +244,8 @@ export function PatternsClient({ analysis, createdAt }: Props) {
                 className="bg-surface border border-edge rounded-xl p-4 shrink-0 w-52"
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="text-white font-semibold text-sm">{hs.state}</span>
-                  <span className="text-[11px] font-semibold text-indigo-400 shrink-0">
+                  <span className="text-ink font-semibold text-sm">{hs.state}</span>
+                  <span className="text-[11px] font-semibold text-primary shrink-0">
                     {hs.totalPostings}
                   </span>
                 </div>

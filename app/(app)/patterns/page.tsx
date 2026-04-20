@@ -16,8 +16,8 @@ export default async function PatternsPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <TrendingUp size={20} className="text-indigo-400" />
-            <h1 className="text-2xl font-semibold text-white">Patterns</h1>
+            <TrendingUp size={20} className="text-primary" />
+            <h1 className="text-2xl font-semibold text-ink">Patterns</h1>
           </div>
           <p className="text-sm text-fg2">
             Gemini-powered hiring intelligence from your scraped data

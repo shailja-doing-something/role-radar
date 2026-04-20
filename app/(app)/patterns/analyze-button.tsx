@@ -46,14 +46,14 @@ export function AnalyzeButton({ lastAnalyzed }: { lastAnalyzed?: string | null }
           type="button"
           onClick={handleRefresh}
           disabled={loading}
-          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           {loading
             ? <Loader2   size={14} className="animate-spin" />
             : <RefreshCw size={14} />}
           {loading ? "Analyzing…" : "Refresh Analysis"}
         </button>
-        {error && <span className="text-red-400 text-sm">{error}</span>}
+        {error && <span className="text-red-600 text-sm">{error}</span>}
       </div>
       <span className="text-xs text-fg3">{formatLastAnalyzed(lastAnalyzed)}</span>
     </div>
