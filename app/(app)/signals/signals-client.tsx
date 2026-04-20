@@ -21,15 +21,17 @@ interface ISASignal {
 }
 
 interface TeamSignal {
-  id:                   number;
-  name:                 string;
-  brokerage:            string | null;
-  location:             string | null;
-  website:              string | null;
-  isaPresence:          string;
-  marketingOpsPresence: string;
-  isaVelocity:          "Hot" | "Active" | "None";
-  liveISASignals:       ISASignal[];
+  id:                    number;
+  name:                  string;
+  brokerage:             string | null;
+  location:              string | null;
+  website:               string | null;
+  isaPresence:           string;
+  marketingOpsPresence:  string;
+  isaVelocity:           "Hot" | "Active" | "None";
+  supabaseISAConfirmed:  boolean;
+  supabaseMktgConfirmed: boolean;
+  liveISASignals:        ISASignal[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -324,18 +326,24 @@ function TeamCard({
             ISA Structure
           </p>
           <PresencePicker
-            value={team.isaPresence}
+            value={team.isaPresence === "Unknown" && team.supabaseISAConfirmed ? "Confirmed" : team.isaPresence}
             onChange={(v) => onUpdate(team.id, "isaPresence", v)}
           />
+          {team.supabaseISAConfirmed && (
+            <p className="text-[11px] text-fg3 mt-1">RealTrends data</p>
+          )}
         </div>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-fg3 mb-1.5">
             Mktg &amp; Ops
           </p>
           <PresencePicker
-            value={team.marketingOpsPresence}
+            value={team.marketingOpsPresence === "Unknown" && team.supabaseMktgConfirmed ? "Confirmed" : team.marketingOpsPresence}
             onChange={(v) => onUpdate(team.id, "marketingOpsPresence", v)}
           />
+          {team.supabaseMktgConfirmed && (
+            <p className="text-[11px] text-fg3 mt-1">RealTrends data</p>
+          )}
         </div>
       </div>
     </div>

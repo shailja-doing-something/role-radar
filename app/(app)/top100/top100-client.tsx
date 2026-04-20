@@ -8,15 +8,40 @@ import {
   Flame, Briefcase,
 } from "lucide-react";
 
+interface ISAEnrichment {
+  isa_agent_count: number | null;
+  isa_categories:  string[] | null;
+}
+
+interface MarketingOpsEnrichment {
+  dept_agent_count: number | null;
+  departments:      string[] | null;
+}
+
+interface RealTrendsEnrichment {
+  rank:            number | null;
+  annual_revenue:  string | null;
+  sides:           number | null;
+  real_trends_url: string | null;
+}
+
+interface Enrichment {
+  isa:          ISAEnrichment | null;
+  marketingOps: MarketingOpsEnrichment | null;
+  realTrends:   RealTrendsEnrichment | null;
+}
+
 interface Team {
-  id:        number;
-  name:      string;
-  brokerage: string | null;
-  location:  string | null;
-  website:   string | null;
-  isMatched: boolean;
-  createdAt: string;
-  roleCount: number;
+  id:             number;
+  name:           string;
+  brokerage:      string | null;
+  location:       string | null;
+  website:        string | null;
+  isMatched:      boolean;
+  supabaseTeamId: string | null;
+  createdAt:      string;
+  roleCount:      number;
+  enrichment:     Enrichment | null;
 }
 
 function timeAgo(iso: string): string {
@@ -48,6 +73,31 @@ function VelocityBadge({ roleCount }: { roleCount: number }) {
     );
   }
   return <span className="text-[11px] text-fg3">Quiet</span>;
+}
+
+function EnrichmentBadge({
+  label,
+  color,
+  tooltip,
+}: {
+  label:   string;
+  color:   "green" | "blue";
+  tooltip: string;
+}) {
+  const colorClass = color === "green"
+    ? "bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success)]"
+    : "bg-surface-raised border-edge text-fg2";
+
+  return (
+    <span
+      className={`relative group inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border cursor-default ${colorClass}`}
+    >
+      {label}
+      <span className="absolute bottom-full left-0 mb-1.5 hidden group-hover:block z-10 min-w-[160px] max-w-[220px] bg-surface border border-edge rounded-lg shadow-lg px-3 py-2 text-[11px] text-fg2 leading-relaxed whitespace-pre-wrap">
+        {tooltip}
+      </span>
+    </span>
+  );
 }
 
 interface PostingRow {
@@ -92,6 +142,9 @@ function TeamCard({
     ? "border-l-green-600"
     : "border-l-edge";
 
+  const e = team.enrichment;
+  const rt = e?.realTrends;
+
   return (
     <div className={`bg-surface border border-edge border-l-4 ${accentClass} rounded-xl overflow-hidden`}>
       <button
@@ -104,6 +157,18 @@ function TeamCard({
             <span className="text-ink font-semibold text-sm truncate">{team.name}</span>
             <VelocityBadge roleCount={team.roleCount} />
           </div>
+
+          {/* RealTrends inline row */}
+          {rt && (rt.rank || rt.sides || rt.annual_revenue) && (
+            <p className="text-[11px] text-fg3 mb-1">
+              {rt.rank    && <>RealTrends #{rt.rank}</>}
+              {rt.rank    && (rt.sides || rt.annual_revenue) && " · "}
+              {rt.sides   && <>{rt.sides.toLocaleString()} sides</>}
+              {rt.sides   && rt.annual_revenue && " · "}
+              {rt.annual_revenue && <>{rt.annual_revenue}</>}
+            </p>
+          )}
+
           <div className="flex items-center gap-3 flex-wrap">
             {team.brokerage && (
               <span className="flex items-center gap-1 text-fg2 text-xs">
@@ -123,6 +188,36 @@ function TeamCard({
               </span>
             )}
           </div>
+
+          {/* Enrichment badges */}
+          {e && (e.isa || e.marketingOps) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              {e.isa && (
+                <EnrichmentBadge
+                  label="ISA Confirmed"
+                  color="green"
+                  tooltip={[
+                    e.isa.isa_agent_count != null ? `ISA agents: ${e.isa.isa_agent_count}` : null,
+                    e.isa.isa_categories?.length
+                      ? `Categories: ${e.isa.isa_categories.join(", ")}`
+                      : null,
+                  ].filter(Boolean).join("\n")}
+                />
+              )}
+              {e.marketingOps && (
+                <EnrichmentBadge
+                  label="Mktg/Ops Confirmed"
+                  color="blue"
+                  tooltip={[
+                    e.marketingOps.dept_agent_count != null ? `Team members: ${e.marketingOps.dept_agent_count}` : null,
+                    e.marketingOps.departments?.length
+                      ? `Departments: ${e.marketingOps.departments.join(", ")}`
+                      : null,
+                  ].filter(Boolean).join("\n")}
+                />
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0 mt-0.5">
           {team.website && (
@@ -138,7 +233,7 @@ function TeamCard({
           )}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(team.id, team.name); }}
+            onClick={(ev) => { ev.stopPropagation(); onDelete(team.id, team.name); }}
             disabled={deletingId === team.id}
             className="text-fg3 hover:text-[var(--danger)] disabled:opacity-40 transition-colors"
           >
@@ -224,7 +319,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
         setAddError(d.error ?? "Failed to add team.");
       } else {
         const team = await res.json() as Team;
-        setTeams((t) => [...t, { ...team, roleCount: 0 }]);
+        setTeams((t) => [...t, { ...team, roleCount: 0, enrichment: null }]);
         setForm({ name: "", brokerage: "", location: "", website: "" });
         setShowDrawer(false);
         router.refresh();
@@ -308,10 +403,9 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
 
       {/* ── Header row ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
-        {/* Tabs */}
         <div className="flex items-center gap-1 bg-surface border border-edge rounded-lg p-1">
           {(["matched", "unmatched"] as const).map((t) => {
-            const count = t === "matched" ? matched.length : unmatched.length;
+            const count  = t === "matched" ? matched.length : unmatched.length;
             const active = tab === t;
             return (
               <button
@@ -396,6 +490,9 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                             <MapPin size={10} className="shrink-0" />
                             {team.location}
                           </span>
+                        )}
+                        {!team.supabaseTeamId && (
+                          <span className="text-[11px] text-fg3">Not found in RealTrends data</span>
                         )}
                       </div>
                     </div>

@@ -6,6 +6,7 @@ import {
 import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
+import { getISATeams } from "@/lib/supabase-data";
 
 export default async function DashboardPage() {
   const now          = Date.now();
@@ -84,6 +85,16 @@ export default async function DashboardPage() {
       })
     : [];
   const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company, p.title]));
+
+  // Supabase ISA structure count
+  const [allTop100Teams, supabaseISATeams] = await Promise.all([
+    prisma.top100Team.findMany({ select: { supabaseTeamId: true } }),
+    getISATeams(),
+  ]);
+  const isaTeamIdSet           = new Set(supabaseISATeams.map((t) => t.team_id));
+  const confirmedISAStructure  = allTop100Teams.filter(
+    (t) => t.supabaseTeamId && isaTeamIdSet.has(t.supabaseTeamId)
+  ).length;
 
   const trendPct = activePostingsPrior > 0
     ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)
@@ -210,6 +221,15 @@ export default async function DashboardPage() {
           </InsightPill>
 
         </div>
+
+        {/* 5th pill — full width */}
+        <div className="mt-3">
+          <InsightPill dotColor="#16A34A">
+            <span className="text-ink font-semibold">{confirmedISAStructure}</span>
+            {" "}of your target accounts have a confirmed ISA structure per RealTrends data
+          </InsightPill>
+        </div>
+
       </div>
 
       {/* ── ROW 3: Two columns ──────────────────────────────────────────────── */}

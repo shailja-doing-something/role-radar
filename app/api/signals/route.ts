@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getISATeams, getMarketingOpsTeams } from "@/lib/supabase-data";
 
 // Roles that indicate ISA / lead-conversion activity
 const ISA_ROLES = ["Inside Sales Agent", "Real Estate Team Lead"];
@@ -26,7 +27,7 @@ function fuzzyMatch(teamName: string, companyName: string): boolean {
 }
 
 export async function GET() {
-  const [teams, postings] = await Promise.all([
+  const [teams, postings, isaTeams, mktgTeams] = await Promise.all([
     prisma.top100Team.findMany({ orderBy: { id: "asc" } }),
     prisma.jobPosting.findMany({
       where: { isTop100: true, isActive: true, title: { in: ISA_ROLES } },
@@ -36,7 +37,12 @@ export async function GET() {
       },
       orderBy: { createdAt: "desc" },
     }),
+    getISATeams(),
+    getMarketingOpsTeams(),
   ]);
+
+  const isaSet  = new Set(isaTeams.map((t) => t.team_id));
+  const mktgSet = new Set(mktgTeams.map((t) => t.team_id));
 
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
@@ -48,6 +54,9 @@ export async function GET() {
 
     const isaVelocity = recentCount >= 3 ? "Hot" : recentCount >= 1 ? "Active" : "None";
 
+    const supabaseISAConfirmed  = !!(team.supabaseTeamId && isaSet.has(team.supabaseTeamId));
+    const supabaseMktgConfirmed = !!(team.supabaseTeamId && mktgSet.has(team.supabaseTeamId));
+
     return {
       id:                   team.id,
       name:                 team.name,
@@ -57,6 +66,8 @@ export async function GET() {
       isaPresence:          team.isaPresence,
       marketingOpsPresence: team.marketingOpsPresence,
       isaVelocity,
+      supabaseISAConfirmed,
+      supabaseMktgConfirmed,
       liveISASignals: liveISASignals.map(p => ({
         id:             p.id,
         normalizedRole: p.title,
