@@ -42,7 +42,9 @@ const ISA_QUERIES = [
   "ISA real estate brokerage hiring USA",
   "Lead Conversion Specialist real estate team USA",
   "Real Estate Inside Sales Manager USA",
-  "Transaction Coordinator real estate team USA",
+  "Transaction Coordinator real estate team hiring USA",
+  "Real Estate Operations Manager team hiring USA",
+  "Listing Coordinator real estate team hiring USA",
 ];
 
 const BROKERAGE_QUERIES = [
@@ -337,7 +339,7 @@ async function layer2ISASearch(): Promise<Layer2Result> {
     await sleep(3000);
   }
 
-  console.log(`[Layer2] 5 ISA searches, ${totalCollected} raw, ${all.length} postings after Gemini filter`);
+  console.log(`[Layer2] ${ISA_QUERIES.length} ISA/ops searches, ${totalCollected} raw, ${all.length} postings after Gemini filter`);
   return { postings: all, rateLimitedCount };
 }
 

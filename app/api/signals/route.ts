@@ -1,8 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { getISATeams, getMarketingOpsTeams } from "@/lib/supabase-data";
 
-// Roles that indicate ISA / lead-conversion activity
-const ISA_ROLES = ["Inside Sales Agent", "Real Estate Team Lead"];
+// All ISA and ops roles the scraper normalizes to
+const ISA_ROLES = [
+  "Inside Sales Agent",
+  "Real Estate Team Lead",
+  "Transaction Coordinator",
+  "Real Estate Operations Manager",
+  "Listing Coordinator",
+  "Real Estate Marketing Manager",
+  "Real Estate Administrative Assistant",
+];
 
 const STRIP_WORDS = new Set([
   "team","group","realty","real","estate","properties","homes",
