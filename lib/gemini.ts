@@ -60,7 +60,8 @@ export async function generateContent(
  * found in the (potentially noisy) response. Falls back to non-search on error.
  */
 export async function generateJSONWithSearch<T = unknown>(prompt: string): Promise<T> {
-  const searchTools: Tool[] = [{ googleSearchRetrieval: {} }];
+  // gemini-2.5-flash uses google_search (not googleSearchRetrieval)
+  const searchTools = [{ googleSearch: {} }] as unknown as Tool[];
   const model = genAI.getGenerativeModel({ model: SEARCH_MODEL, tools: searchTools });
 
   try {
