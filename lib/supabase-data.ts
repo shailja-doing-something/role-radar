@@ -88,18 +88,47 @@ export async function getRealTrendsTeam(teamId: string): Promise<RealTrendsTeam 
   }
 }
 
+// Strip noise words, punctuation, and whitespace for fuzzy matching
+function normalizeTeamName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(team|group|realty|real estate|properties|homes|associates|llc|inc|brokered by|brokerage|the|and|&)\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Extract the most distinctive 1–2 word token from a normalized name
+function coreToken(normalized: string): string {
+  const words = normalized.split(" ").filter((w) => w.length > 2);
+  return words.slice(0, 2).join(" ");
+}
+
 export async function matchSupabaseTeam(roleRadarTeamName: string): Promise<SupabaseTeamMatch | null> {
   try {
-    const stripped = roleRadarTeamName
-      .toLowerCase()
-      .replace(/team|group|realty|real estate|properties|homes|associates|llc|inc/g, "")
-      .trim();
-    const rows = await readonlyQuery<SupabaseTeamMatch>(`
-      SELECT id, team_name, city, state, website_url
+    const normalized = normalizeTeamName(roleRadarTeamName);
+    const core       = coreToken(normalized);
+
+    // Try exact normalized substring match first (most precise)
+    if (core) {
+      const rows = await readonlyQuery<SupabaseTeamMatch>(`
+        SELECT id, team_name, city, state, website_url
+        FROM mad.teams
+        WHERE regexp_replace(lower(team_name), '[^a-z0-9 ]', ' ', 'g') LIKE $1
+        LIMIT 1
+      `, [`%${core}%`]);
+      if (rows[0]) return rows[0];
+    }
+
+    // Fallback: use pg_trgm similarity for fuzzy matching
+    const rows = await readonlyQuery<SupabaseTeamMatch & { sim: number }>(`
+      SELECT id, team_name, city, state, website_url,
+             similarity(lower(team_name), $1) AS sim
       FROM mad.teams
-      WHERE lower(team_name) LIKE $1
+      WHERE similarity(lower(team_name), $1) > 0.2
+      ORDER BY sim DESC
       LIMIT 1
-    `, [`%${stripped}%`]);
+    `, [normalized]);
     return rows[0] ?? null;
   } catch (err) {
     console.error("[supabase-data] matchSupabaseTeam error:", err);
