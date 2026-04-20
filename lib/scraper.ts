@@ -641,6 +641,29 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
 
   const l1 = l1Result.postings;
   const l2 = l2Result.postings;
+
+  // Save JSearch results immediately — protect quota investment before Gemini layers run
+  {
+    const jMap = new Map<string, RawPosting>();
+    for (const p of [...l1, ...l2]) {
+      if (!p.url) continue;
+      const ex = jMap.get(p.url);
+      if (!ex || (p.isTop100 && !ex.isTop100)) jMap.set(p.url, p);
+    }
+    const jsearchRaw = [...jMap.values()];
+    if (jsearchRaw.length > 0) {
+      const jsearchNorm = await normalizeRoles(jsearchRaw);
+      let savedCount = 0;
+      const jBySource: Record<string, ScrapedPosting[]> = {};
+      for (const p of jsearchNorm) (jBySource[p.source] ??= []).push(p);
+      for (const [slug, posts] of Object.entries(jBySource)) {
+        const { created, refreshed } = await upsertPostings(posts, slug);
+        savedCount += created + refreshed;
+      }
+      console.log(`[Scraper] JSearch saved early: ${savedCount} postings (L1=${l1.length} L2=${l2.length})`);
+    }
+  }
+
   const l3 = await layer3WebsiteSearch();
   const l4 = await layer4BrokerageSearch();
 
