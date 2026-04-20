@@ -1,4 +1,8 @@
 import { Pool } from "pg";
+import dns from "dns";
+
+// Force IPv4 — Railway cannot reach Supabase over IPv6
+dns.setDefaultResultOrder("ipv4first");
 
 if (!process.env.SUPABASE_DB_URL) {
   throw new Error("SUPABASE_DB_URL is not set");
