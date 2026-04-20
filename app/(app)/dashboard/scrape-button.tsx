@@ -87,7 +87,7 @@ export function ScrapeButton({ lastScraped }: { lastScraped?: string | null }) {
           type="button"
           onClick={handleClick}
           disabled={running}
-          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           {running
             ? <Loader2 size={14} className="animate-spin" />
