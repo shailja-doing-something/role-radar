@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0A0A0F;
-  --foreground: #F1F1F5;
+  --background: #F8F7F4;
+  --foreground: #111111;
 }
 
 @theme inline {
@@ -10,22 +10,43 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* Design system surface colors */
-  --color-app-bg:        #0A0A0F;
-  --color-surface:       #13131A;
-  --color-surface-raised:#1C1C27;
-  --color-edge:          #2A2A3A;
+  /* ── Surface / structural ─────────────────────────────────────────────── */
+  --color-app-bg:         #F8F7F4;
+  --color-surface:        #FFFFFF;
+  --color-surface-raised: #F3F2EF;
+  --color-edge:           #E5E3DF;
+  --color-edge-light:     #EDECE9;
 
-  /* Design system text colors */
-  --color-fg2: #8B8BA0;
-  --color-fg3: #4A4A60;
+  /* ── Primary (orange) ────────────────────────────────────────────────── */
+  --color-primary:        #F97316;
+  --color-primary-hover:  #EA6A0A;
+  --color-primary-soft:   #FFF4ED;
+  --color-primary-muted:  #FED7AA;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --color-ink:  #111111;   /* primary body text, headings */
+  --color-fg2:  #6B6B6B;   /* secondary / supporting text */
+  --color-fg3:  #9E9E9E;   /* muted / timestamps / placeholders */
 }
 
 body {
-  background: #0A0A0F;
-  color: #F1F1F5;
+  background: #F8F7F4;
+  color: #111111;
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+::selection {
+  background: #FED7AA;
+  color: #111111;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #E5E3DF; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #9E9E9E; }
 
 /* ── Skeleton shimmer ──────────────────────────────────────────────────────── */
 @keyframes shimmer {
@@ -36,9 +57,9 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    #1C1C27 25%,
-    #252538 50%,
-    #1C1C27 75%
+    #F3F2EF 25%,
+    #E8E7E3 50%,
+    #F3F2EF 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite linear;

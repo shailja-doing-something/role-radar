@@ -28,15 +28,15 @@ let _id = 0;
 const ICON = { success: CheckCircle, error: AlertCircle, info: Info } as const;
 
 const BORDER = {
-  success: "border-l-green-500",
-  error:   "border-l-red-500",
-  info:    "border-l-indigo-500",
+  success: "border-l-green-600",
+  error:   "border-l-red-600",
+  info:    "border-l-orange-500",
 } as const;
 
 const ICON_COLOR = {
-  success: "text-green-500",
-  error:   "text-red-500",
-  info:    "text-indigo-400",
+  success: "text-green-600",
+  error:   "text-red-600",
+  info:    "text-orange-500",
 } as const;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -61,10 +61,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className={`toast-enter flex items-start gap-3 bg-surface border border-edge border-l-4 ${BORDER[t.type]} rounded-lg shadow-2xl p-4 w-[320px] pointer-events-auto`}
+              className={`toast-enter flex items-start gap-3 bg-surface border border-edge border-l-4 ${BORDER[t.type]} rounded-lg shadow-lg p-4 w-[320px] pointer-events-auto`}
             >
               <Icon size={15} className={`shrink-0 mt-0.5 ${ICON_COLOR[t.type]}`} />
-              <p className="flex-1 text-sm text-white leading-snug">{t.message}</p>
+              <p className="flex-1 text-sm text-ink leading-snug">{t.message}</p>
               <button
                 type="button"
                 onClick={() => dismiss(t.id)}

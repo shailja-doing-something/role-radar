@@ -4,12 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Radar,
   LayoutDashboard,
   TrendingUp,
   Trophy,
   Database,
-  Settings,
   Briefcase,
   Zap,
   ChevronLeft,
@@ -52,14 +50,13 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Config",
     items: [
-      { href: "/sources",  label: "Sources",  icon: Database },
-      { href: "/settings", label: "Settings", icon: Settings },
+      { href: "/sources", label: "Sources", icon: Database },
     ],
   },
 ];
 
 export function Nav() {
-  const pathname   = usePathname();
+  const pathname    = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -68,18 +65,15 @@ export function Nav() {
         collapsed ? "w-[60px]" : "w-[240px]"
       }`}
     >
-      {/* Indigo brand accent */}
-      <div className="h-0.5 bg-indigo-500 w-full shrink-0" />
-
       {/* Logo */}
       <div
         className={`flex items-center h-16 shrink-0 border-b border-edge ${
           collapsed ? "justify-center px-0" : "gap-2.5 px-6"
         }`}
       >
-        <Radar size={20} className="text-indigo-400 shrink-0" />
+        <span className="w-[18px] h-[18px] rounded-full bg-primary shrink-0 flex items-center justify-center" />
         {!collapsed && (
-          <span className="text-white font-semibold text-[15px] tracking-tight">
+          <span className="text-ink font-bold text-[16px] tracking-tight">
             RoleRadar
           </span>
         )}
@@ -90,7 +84,7 @@ export function Nav() {
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} className={gi > 0 ? "mt-5" : ""}>
             {!collapsed && (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg3 px-3 mb-1.5 select-none">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg3 px-3 mb-1.5 select-none">
                 {group.label}
               </p>
             )}
@@ -106,17 +100,17 @@ export function Nav() {
                     href={href}
                     title={collapsed ? label : undefined}
                     className={[
-                      "flex items-center gap-2.5 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                      "flex items-center gap-2.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                       collapsed
                         ? "justify-center px-2"
                         : "border-l-2 pl-[10px] pr-3",
                       active
                         ? collapsed
-                          ? "bg-indigo-500/10 text-indigo-400"
-                          : "border-indigo-500 bg-indigo-500/10 text-indigo-400"
+                          ? "bg-primary-soft text-primary"
+                          : "border-primary bg-primary-soft text-primary font-semibold"
                         : collapsed
-                          ? "text-fg2 hover:bg-surface-raised hover:text-white"
-                          : "border-transparent text-fg2 hover:bg-surface-raised hover:text-white",
+                          ? "text-fg2 hover:bg-surface-raised hover:text-ink border-transparent"
+                          : "border-transparent text-fg2 hover:bg-surface-raised hover:text-ink",
                     ].join(" ")}
                   >
                     <Icon size={16} className="shrink-0" />
