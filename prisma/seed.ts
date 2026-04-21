@@ -237,7 +237,7 @@ async function main() {
       // Refresh static metadata; preserve signals and supabaseTeamId
       await prisma.top100Team.update({
         where: { id: existing.id },
-        data:  { brokerage: team.brokerage, location: team.location, website: team.website },
+        data:  { brokerage: team.brokerage, location: team.location, website: team.website, isPriority: true },
       });
     } else {
       await prisma.top100Team.create({
@@ -245,6 +245,7 @@ async function main() {
           ...team,
           isaPresence:          "Unknown",
           marketingOpsPresence: "Unknown",
+          isPriority:           true,
         },
       });
     }

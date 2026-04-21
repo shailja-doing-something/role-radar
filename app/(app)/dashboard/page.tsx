@@ -130,15 +130,20 @@ export default async function DashboardPage() {
   const isaPct   = totalActive > 0 ? Math.round((isaCount / totalActive) * 100) : 0;
   const isaAbove = isaPct >= 30;
 
-  console.log("[Dashboard]", {
-    activePostings30,
-    targetPostings,
-    isaCount,
-    activelyHiringTeams: targetTeamActivity.length,
-    totalActive,
-    isaPct,
-    confirmedISAStructure,
-  });
+  console.log(
+    `[Dashboard] Active: ${activePostings30} | Target Account: ${targetPostings}` +
+    ` | Hiring Teams: ${activelyHiringTeams} | ISA Open: ${isaCount}`
+  );
+  console.log(
+    `[Dashboard] Top role: ${topRole?.title ?? "none"} (${topRole?._count.title ?? 0})` +
+    ` | Top state: ${topStateEntry?.[0] ?? "none"} (${topStateEntry?.[1] ?? 0})` +
+    ` | Top team: ${topTeam?.company ?? "none"} (${topTeam?._count.company ?? 0})` +
+    ` | ISA%: ${isaPct}%`
+  );
+  console.log(`[Dashboard] RealTrends ISA confirmed: ${confirmedISAStructure}`);
+  if (targetPostings > activePostings30)    console.warn("[Dashboard] WARNING: Target Account Postings > Active Postings");
+  if (activelyHiringTeams > 95)            console.warn("[Dashboard] WARNING: Actively Hiring Teams > 95");
+  if (confirmedISAStructure > allTop100Teams.length) console.warn("[Dashboard] WARNING: RealTrends ISA count > total teams");
 
   return (
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">

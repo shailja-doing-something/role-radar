@@ -352,6 +352,17 @@ export function SignalsClient() {
     total:        teams.length,
   };
 
+  // Sanity checks — log once per load
+  if (teams.length > 0 && stats.total === teams.length) {
+    console.log(
+      `[Signals] ISA Presence: ${stats.isaPresence} | Actively Hiring ISA: ${stats.activeHiring}` +
+      ` | Marketing Ops: ${stats.mktgPresence} | Total Accounts: ${stats.total}`
+    );
+    if (stats.activeHiring > stats.total) console.warn("[Signals] WARNING: Actively Hiring Teams > Total Accounts");
+    if (stats.isaPresence > stats.total)  console.warn("[Signals] WARNING: ISA Presence > Total Accounts");
+    if (stats.mktgPresence > stats.total) console.warn("[Signals] WARNING: Marketing Ops > Total Accounts");
+  }
+
   function clearFilters() {
     setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg("");
   }
