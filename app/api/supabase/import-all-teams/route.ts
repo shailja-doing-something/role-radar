@@ -49,6 +49,7 @@ export async function POST() {
         supabaseTeamId:       t.id,
         isaPresence:          "Unknown",
         marketingOpsPresence: "Unknown",
+        isPriority:           true,
       })),
       skipDuplicates: true,
     });

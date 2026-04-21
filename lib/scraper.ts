@@ -245,24 +245,14 @@ async function layer1NamedTeamSearch(): Promise<Layer1Result> {
   const allTeams = await prisma.targetAccount.findMany({ select: { teamName: true, isPriority: true } });
   if (allTeams.length === 0) { console.log("[Layer1] No teams found — skipping"); return { postings: [], rateLimitedCount: 0, covered: 0, total: 0 }; }
 
-  // Build batch: 15 random priority + 5 random non-priority
-  const priority    = allTeams.filter(t => t.isPriority);
-  const nonPriority = allTeams.filter(t => !t.isPriority);
-
-  const shufflePick = <T,>(arr: T[], n: number): T[] => {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a.slice(0, n);
-  };
-
-  const batch = [
-    ...shufflePick(priority,    Math.min(15, priority.length)),
-    ...shufflePick(nonPriority, Math.min(5,  nonPriority.length)),
-  ];
-  console.log(`[Layer1] Batch: ${Math.min(15, priority.length)} priority + ${Math.min(5, nonPriority.length)} non-priority teams this run`);
+  // Shuffle all teams and take 20 per run — covers all accounts evenly over time
+  const shuffled = [...allTeams];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const batch = shuffled.slice(0, 20);
+  console.log(`[Layer1] Batch: ${batch.length} of ${allTeams.length} total accounts this run (randomized)`);
 
   const all: RawPosting[]         = [];
   let   totalCollected            = 0;
