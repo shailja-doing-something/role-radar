@@ -13,6 +13,7 @@ export async function GET() {
       brokerage: t.brokerage,
       location:  t.location,
       website:   t.website,
+      isPriority: t.isPriority,
     }))
   );
 }

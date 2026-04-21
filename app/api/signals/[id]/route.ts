@@ -13,8 +13,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const numId = parseInt(id, 10);
-  if (isNaN(numId)) return Response.json({ error: "Invalid id" }, { status: 400 });
+  if (!id) return Response.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json() as Record<string, unknown>;
   const data: Partial<{ isaPresence: string; marketingOpsPresence: string }> = {};
@@ -30,6 +29,6 @@ export async function PATCH(
 
   if (Object.keys(data).length === 0) return Response.json({ error: "No fields to update" }, { status: 400 });
 
-  const updated = await prisma.top100Team.update({ where: { id: numId }, data });
+  const updated = await prisma.targetAccount.update({ where: { id }, data });
   return Response.json(updated);
 }

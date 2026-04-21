@@ -49,9 +49,10 @@ model JobPosting {
   jobBoard    JobBoard  @relation(fields: [source], references: [slug])
   salary      String?
   postedAt    DateTime?
-  isActive    Boolean   @default(true)
-  isTop100    Boolean   @default(false)
-  scrapedAt   DateTime  @default(now())
+  isActive            Boolean   @default(true)
+  isTop100            Boolean   @default(false)
+  isPriorityAccount   Boolean   @default(false)
+  scrapedAt           DateTime  @default(now())
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -68,20 +69,22 @@ model Pattern {
   @@unique([keyword, period])
 }
 
-model Top100Team {
-  id                   Int      @id @default(autoincrement())
-  name                 String
+model TargetAccount {
+  id                   String   @id @default(cuid())
+  teamName             String   @unique
   brokerage            String?
   location             String?
   website              String?
-  isMatched            Boolean  @default(false)
-  matchedName          String?
+  city                 String?
+  state                String?
+  zillow_url           String?
+  supabaseTeamId       String?
   isaPresence          String   @default("Unknown")
   marketingOpsPresence String   @default("Unknown")
-  supabaseTeamId       String?
+  isMatched            Boolean  @default(false)
+  matchedName          String?
   isPriority           Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  uploadedAt           DateTime @default(now())
 }
 
 // Singleton row (id always = 1) — stores global app configuration

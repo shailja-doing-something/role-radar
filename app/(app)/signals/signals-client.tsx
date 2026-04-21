@@ -18,11 +18,12 @@ interface ISASignal {
 }
 
 interface TeamSignal {
-  id:                    number;
-  name:                  string;
+  id:                    string;
+  teamName:              string;
   brokerage:             string | null;
   location:              string | null;
   website:               string | null;
+  isPriority:            boolean;
   isaPresence:           string;
   marketingOpsPresence:  string;
   isaVelocity:           "Hot" | "Active" | "None";
@@ -159,7 +160,7 @@ function TeamCard({ team }: { team: TeamSignal }) {
       {/* ROW 1: WHO */}
       <div className="px-5 pt-4 pb-3 border-b border-edge flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[15px] font-bold text-ink leading-snug truncate">{team.name}</p>
+          <p className="text-[15px] font-bold text-ink leading-snug truncate">{team.teamName}</p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             {team.brokerage && <span className="text-[13px] text-fg2">{team.brokerage}</span>}
             {team.brokerage && team.location && <span className="text-fg3 text-[13px]">·</span>}
@@ -272,7 +273,7 @@ export function SignalsClient() {
   useEffect(() => { loadSignals(); }, [loadSignals]);
 
   async function updatePresence(
-    id:    number,
+    id:    string,
     field: "isaPresence" | "marketingOpsPresence",
     value: string,
   ) {
@@ -305,7 +306,7 @@ export function SignalsClient() {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
-            teams: batch.map((t) => ({ id: t.id, name: t.name, brokerage: t.brokerage, location: t.location })),
+            teams: batch.map((t) => ({ id: t.id, teamName: t.teamName, brokerage: t.brokerage, location: t.location })),
           }),
         });
         if (res.ok) {
@@ -332,7 +333,7 @@ export function SignalsClient() {
 
   const filtered = teams
     .filter((t) => {
-      if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !t.teamName.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterISA === "Confirmed" && !t.supabaseISAConfirmed)  return false;
       if (filterISA === "Unknown"   &&  t.supabaseISAConfirmed)  return false;
       if (filterVelocity === "Actively Hiring" && t.isaVelocity === "None") return false;

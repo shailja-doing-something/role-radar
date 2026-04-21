@@ -10,13 +10,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const teamId = parseInt(id, 10);
-  if (isNaN(teamId)) {
+  if (!id) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const team = await prisma.top100Team.findUnique({
-    where: { id: teamId },
+  const team = await prisma.targetAccount.findUnique({
+    where:  { id },
     select: { supabaseTeamId: true },
   });
 
@@ -38,9 +37,9 @@ export async function GET(
   ]);
 
   return NextResponse.json({
-    matched:     true,
-    realTrends:  rtMap.get(sid) ?? null,
-    isa:         isaRows[0]     ?? null,
-    marketingOps: mktgRows[0]  ?? null,
+    matched:      true,
+    realTrends:   rtMap.get(sid) ?? null,
+    isa:          isaRows[0]     ?? null,
+    marketingOps: mktgRows[0]   ?? null,
   });
 }

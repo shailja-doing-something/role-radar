@@ -32,14 +32,15 @@ interface Enrichment {
 }
 
 interface Team {
-  id:             number;
-  name:           string;
+  id:             string;
+  teamName:       string;
   brokerage:      string | null;
   location:       string | null;
   website:        string | null;
   isMatched:      boolean;
+  isPriority:     boolean;
   supabaseTeamId: string | null;
-  createdAt:      string;
+  uploadedAt:     string;
   roleCount:      number;
   latestTitle:    string | null;
   enrichment:     Enrichment | null;
@@ -98,7 +99,7 @@ function EnrichmentBadge({ label, color, tooltip }: { label: string; color: "gre
 interface PostingRow { id: number; title: string; location: string | null; createdAt: string; }
 
 function TeamCard({ team, onDelete, deletingId }: {
-  team: Team; onDelete: (id: number, name: string) => void; deletingId: number | null;
+  team: Team; onDelete: (id: string, teamName: string) => void; deletingId: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [postings, setPostings] = useState<PostingRow[]>([]);
@@ -108,7 +109,7 @@ function TeamCard({ team, onDelete, deletingId }: {
     if (!expanded && postings.length === 0) {
       setLoading(true);
       try {
-        const res = await fetch(`/api/postings?company=${encodeURIComponent(team.name)}&top100Only=true&limit=20`);
+        const res = await fetch(`/api/postings?company=${encodeURIComponent(team.teamName)}&top100Only=true&limit=20`);
         if (res.ok) setPostings(((await res.json()) as { postings?: PostingRow[] }).postings ?? []);
       } finally { setLoading(false); }
     }
@@ -134,7 +135,7 @@ function TeamCard({ team, onDelete, deletingId }: {
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-ink font-semibold text-sm truncate">{team.name}</span>
+            <span className="text-ink font-semibold text-sm truncate">{team.teamName}</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap text-xs">
             {team.brokerage && (
@@ -159,7 +160,7 @@ function TeamCard({ team, onDelete, deletingId }: {
             </a>
           )}
           <button type="button"
-            onClick={(ev) => { ev.stopPropagation(); onDelete(team.id, team.name); }}
+            onClick={(ev) => { ev.stopPropagation(); onDelete(team.id, team.teamName); }}
             disabled={deletingId === team.id}
             className="text-fg3 hover:text-[var(--danger)] disabled:opacity-40 transition-colors">
             <Trash2 size={13} />
@@ -257,8 +258,8 @@ function TeamCard({ team, onDelete, deletingId }: {
 
 // ── Add team drawer ───────────────────────────────────────────────────────────
 
-const FIELD_DEFS: { label: string; key: "name"|"brokerage"|"location"|"website"; placeholder: string; required?: boolean }[] = [
-  { label: "Team Name *", key: "name",      placeholder: "e.g. The Smith Group", required: true },
+const FIELD_DEFS: { label: string; key: "teamName"|"brokerage"|"location"|"website"; placeholder: string; required?: boolean }[] = [
+  { label: "Team Name *", key: "teamName",  placeholder: "e.g. The Smith Group", required: true },
   { label: "Brokerage",   key: "brokerage", placeholder: "e.g. Keller Williams" },
   { label: "Location",    key: "location",  placeholder: "e.g. Austin, TX" },
   { label: "Website",     key: "website",   placeholder: "https://example.com" },
@@ -268,10 +269,10 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
   const [teams,      setTeams]      = useState(initial);
   const [tab,        setTab]        = useState<"matched"|"unmatched">("matched");
   const [showDrawer, setShowDrawer] = useState(false);
-  const [form,       setForm]       = useState({ name: "", brokerage: "", location: "", website: "" });
+  const [form,       setForm]       = useState({ teamName: "", brokerage: "", location: "", website: "" });
   const [saving,     setSaving]     = useState(false);
   const [addError,   setAddError]   = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -287,10 +288,10 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setAddError("Team name is required."); return; }
+    if (!form.teamName.trim()) { setAddError("Team name is required."); return; }
     setSaving(true); setAddError("");
     try {
-      const res = await fetch("/api/top100/add", {
+      const res = await fetch("/api/target-accounts/add", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -300,7 +301,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
       } else {
         const team = await res.json() as Team;
         setTeams((t) => [...t, { ...team, roleCount: 0, latestTitle: null, enrichment: null }]);
-        setForm({ name: "", brokerage: "", location: "", website: "" });
+        setForm({ teamName: "", brokerage: "", location: "", website: "" });
         setShowDrawer(false);
         router.refresh();
       }
@@ -308,11 +309,11 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
     finally { setSaving(false); }
   }
 
-  async function handleDelete(id: number, name: string) {
-    if (!confirm(`Remove "${name}" from the list?`)) return;
+  async function handleDelete(id: string, teamName: string) {
+    if (!confirm(`Remove "${teamName}" from the list?`)) return;
     setDeletingId(id);
     try {
-      await fetch(`/api/top100/${id}`, { method: "DELETE" });
+      await fetch(`/api/target-accounts/${id}`, { method: "DELETE" });
       setTeams((t) => t.filter((team) => team.id !== id));
       router.refresh();
     } finally { setDeletingId(null); }
@@ -399,7 +400,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
               {unmatched.map((team) => (
                 <div key={team.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-raised transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-ink text-sm font-medium truncate">{team.name}</p>
+                    <p className="text-ink text-sm font-medium truncate">{team.teamName}</p>
                     <div className="flex items-center gap-3 mt-0.5">
                       {team.brokerage && (
                         <span className="flex items-center gap-1 text-fg3 text-xs">
@@ -418,7 +419,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <span className="text-fg3 text-xs">No postings found</span>
-                    <span className="text-fg3 text-xs">{timeAgo(team.createdAt)}</span>
+                    <span className="text-fg3 text-xs">{timeAgo(team.uploadedAt)}</span>
                     {team.website && (
                       <a href={team.website.startsWith("http") ? team.website : `https://${team.website}`}
                         target="_blank" rel="noopener noreferrer"
@@ -426,7 +427,7 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                         <ExternalLink size={13} />
                       </a>
                     )}
-                    <button type="button" onClick={() => handleDelete(team.id, team.name)}
+                    <button type="button" onClick={() => handleDelete(team.id, team.teamName)}
                       disabled={deletingId === team.id}
                       className="text-fg3 hover:text-[var(--danger)] disabled:opacity-40 transition-colors">
                       <Trash2 size={13} />

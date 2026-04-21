@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { generateJSON } from "@/lib/gemini";
 
 interface TeamInput {
-  id:        number;
-  name:      string;
+  id:        string;
+  teamName:  string;
   brokerage: string | null;
   location:  string | null;
 }
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     `For each of these real estate teams, based on their name, brokerage, and any common knowledge of team structures, estimate:\n` +
     `1. Whether they likely have a dedicated ISA (Inside Sales Agent) structure\n` +
     `2. Whether they likely have a dedicated Marketing or Operations team member\n\n` +
-    `Teams: ${JSON.stringify(teams.map(t => ({ teamName: t.name, brokerage: t.brokerage, location: t.location })))}\n\n` +
+    `Teams: ${JSON.stringify(teams.map(t => ({ teamName: t.teamName, brokerage: t.brokerage, location: t.location })))}\n\n` +
     `Respond with a JSON array in the same order. Each item:\n` +
     `{ "teamName": string, "isaPresence": "Confirmed" | "Likely" | "None" | "Unknown", "marketingOpsPresence": "Confirmed" | "Likely" | "None" | "Unknown", "reasoning": string }\n` +
     `No markdown, no backticks.`;
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const marketingOpsPresence = VALID_PRESENCE.has(result.marketingOpsPresence) ? result.marketingOpsPresence : "Unknown";
 
     try {
-      const updated = await prisma.top100Team.update({
+      const updated = await prisma.targetAccount.update({
         where: { id: team.id },
         data:  { isaPresence, marketingOpsPresence },
       });

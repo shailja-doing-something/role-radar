@@ -222,36 +222,46 @@ async function main() {
   }
   console.log(`Seeded ${JOB_BOARDS.length} job boards.`);
 
-  // Top100Teams: upsert the hardcoded list by name — never delete, so any
-  // teams imported via /api/supabase/import-all-teams survive redeployment.
-  console.log("Seeding Top 100 Teams...");
-  const existingTeams = await prisma.top100Team.findMany({
-    select: { id: true, name: true, isaPresence: true, marketingOpsPresence: true, supabaseTeamId: true },
-  });
-  const signalMap = new Map(existingTeams.map(t => [t.name, t]));
+  // TargetAccounts: upsert the original 95 priority teams by name.
+  // Never delete — teams imported via /api/supabase/import-all-teams survive redeployment.
+  console.log("Seeding Target Accounts (priority list)...");
 
-  let seeded = 0;
-  for (const team of TOP_100_TEAMS) {
-    const existing = signalMap.get(team.name);
-    if (existing) {
-      // Refresh static metadata; preserve signals and supabaseTeamId
-      await prisma.top100Team.update({
-        where: { id: existing.id },
-        data:  { brokerage: team.brokerage, location: team.location, website: team.website, isPriority: true },
-      });
-    } else {
-      await prisma.top100Team.create({
-        data: {
-          ...team,
-          isaPresence:          "Unknown",
-          marketingOpsPresence: "Unknown",
-          isPriority:           true,
-        },
-      });
+  const existingTeams = await prisma.targetAccount.count();
+  if (existingTeams === 0) {
+    // DB is empty — seed the 95 priority teams as bootstrap fallback
+    await prisma.targetAccount.createMany({
+      data: TOP_100_TEAMS.map((team) => ({
+        teamName:             team.name,
+        brokerage:            team.brokerage,
+        location:             team.location,
+        website:              team.website,
+        isaPresence:          "Unknown",
+        marketingOpsPresence: "Unknown",
+        isPriority:           true,
+      })),
+      skipDuplicates: true,
+    });
+    console.log(`Seeded ${TOP_100_TEAMS.length} priority teams (empty DB bootstrap).`);
+  } else {
+    // DB already has teams — just ensure the 95 are marked isPriority=true
+    const existing = await prisma.targetAccount.findMany({
+      select: { id: true, teamName: true },
+    });
+    const nameMap = new Map(existing.map(t => [t.teamName, t.id]));
+
+    let updated = 0;
+    for (const team of TOP_100_TEAMS) {
+      const id = nameMap.get(team.name);
+      if (id) {
+        await prisma.targetAccount.update({
+          where: { id },
+          data:  { brokerage: team.brokerage, location: team.location, website: team.website, isPriority: true },
+        });
+        updated++;
+      }
     }
-    seeded++;
+    console.log(`Updated ${updated} priority teams (isPriority=true).`);
   }
-  console.log(`Seeded ${seeded} teams.`);
 }
 
 main()

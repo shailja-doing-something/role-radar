@@ -36,7 +36,7 @@ function fuzzyMatch(teamName: string, companyName: string): boolean {
 
 export async function GET() {
   const [teams, postings, isaTeams, mktgTeams] = await Promise.all([
-    prisma.top100Team.findMany({ orderBy: { id: "asc" } }),
+    prisma.targetAccount.findMany({ orderBy: { uploadedAt: "asc" } }),
     prisma.jobPosting.findMany({
       where: { isTop100: true, isActive: true, title: { in: ISA_ROLES } },
       select: {
@@ -55,7 +55,7 @@ export async function GET() {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
   const result = teams.map((team) => {
-    const liveISASignals = postings.filter(p => fuzzyMatch(team.name, p.company));
+    const liveISASignals = postings.filter(p => fuzzyMatch(team.teamName, p.company));
     const recentCount    = liveISASignals.filter(p =>
       (p.postedAt ?? p.createdAt) >= fourteenDaysAgo
     ).length;
@@ -67,10 +67,11 @@ export async function GET() {
 
     return {
       id:                   team.id,
-      name:                 team.name,
+      teamName:             team.teamName,
       brokerage:            team.brokerage,
       location:             team.location,
       website:              team.website,
+      isPriority:           team.isPriority,
       isaPresence:          team.isaPresence,
       marketingOpsPresence: team.marketingOpsPresence,
       isaVelocity,

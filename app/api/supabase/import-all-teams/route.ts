@@ -14,7 +14,6 @@ interface MadTeamRow {
 }
 
 export async function POST() {
-  // Fetch all teams from mad.teams, picking up brokerage from isa/mktg join
   const madTeams = await readonlyQuery<MadTeamRow>(`
     SELECT
       t.id,
@@ -24,13 +23,12 @@ export async function POST() {
       t.website_url,
       COALESCE(i.brokerage, m.brokerage) AS brokerage
     FROM mad.teams t
-    LEFT JOIN mad.isa_teams i         ON t.id = i.team_id
+    LEFT JOIN mad.isa_teams i           ON t.id = i.team_id
     LEFT JOIN mad.marketing_ops_teams m ON t.id = m.team_id
     ORDER BY t.team_name
   `);
 
-  // Find which supabaseTeamIds already exist in our DB
-  const existing = await prisma.top100Team.findMany({
+  const existing = await prisma.targetAccount.findMany({
     select: { supabaseTeamId: true },
   });
   const existingIds = new Set(
@@ -40,11 +38,13 @@ export async function POST() {
   const toImport = madTeams.filter((t) => !existingIds.has(t.id));
 
   if (toImport.length > 0) {
-    await prisma.top100Team.createMany({
+    await prisma.targetAccount.createMany({
       data: toImport.map((t) => ({
-        name:                 t.team_name,
+        teamName:             t.team_name,
         brokerage:            t.brokerage   ?? null,
         location:             [t.city, t.state].filter(Boolean).join(", ") || null,
+        city:                 t.city        ?? null,
+        state:                t.state       ?? null,
         website:              t.website_url ?? null,
         supabaseTeamId:       t.id,
         isaPresence:          "Unknown",

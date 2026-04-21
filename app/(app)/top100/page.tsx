@@ -9,12 +9,16 @@ export const metadata: Metadata = { title: "Target Accounts — RoleRadar" };
 
 export default async function Top100Page() {
   const [teamsRaw, postingCounts, isaTeams, mktgTeams] = await Promise.all([
-    prisma.top100Team.findMany({
-      orderBy: { id: "asc" },
-      select: { id: true, name: true, brokerage: true, location: true, website: true, isMatched: true, supabaseTeamId: true, createdAt: true },
+    prisma.targetAccount.findMany({
+      orderBy: { uploadedAt: "asc" },
+      select: {
+        id: true, teamName: true, brokerage: true, location: true,
+        website: true, isMatched: true, supabaseTeamId: true,
+        isPriority: true, uploadedAt: true,
+      },
     }),
     prisma.jobPosting.groupBy({
-      by: ["company"],
+      by:    ["company"],
       where: { isTop100: true, isActive: true },
       _count: { company: true },
     }),
@@ -22,7 +26,6 @@ export default async function Top100Page() {
     getMarketingOpsTeams(),
   ]);
 
-  // Latest active role title per company (for Section A LIVE data)
   const latestTitleRows = await prisma.jobPosting.findMany({
     where:    { isTop100: true, isActive: true },
     orderBy:  { createdAt: "desc" },
@@ -31,19 +34,18 @@ export default async function Top100Page() {
   });
   const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company.toLowerCase(), p.title]));
 
-  const countMap  = new Map(postingCounts.map((p) => [p.company.toLowerCase(), p._count.company]));
-  const isaMap    = new Map(isaTeams.map((t) => [t.team_id, t]));
-  const mktgMap   = new Map(mktgTeams.map((t) => [t.team_id, t]));
+  const countMap = new Map(postingCounts.map((p) => [p.company.toLowerCase(), p._count.company]));
+  const isaMap   = new Map(isaTeams.map((t) => [t.team_id, t]));
+  const mktgMap  = new Map(mktgTeams.map((t) => [t.team_id, t]));
 
-  // Single batch query for all RealTrends data
   const matchedIds = teamsRaw.map((t) => t.supabaseTeamId).filter(Boolean) as string[];
   const rtMap      = await getRealTrendsTeams(matchedIds);
 
   const teams = teamsRaw.map((t) => ({
     ...t,
-    createdAt:   t.createdAt.toISOString(),
-    roleCount:   countMap.get(t.name.toLowerCase()) ?? 0,
-    latestTitle: latestTitleMap.get(t.name.toLowerCase()) ?? null,
+    uploadedAt:  t.uploadedAt.toISOString(),
+    roleCount:   countMap.get(t.teamName.toLowerCase()) ?? 0,
+    latestTitle: latestTitleMap.get(t.teamName.toLowerCase()) ?? null,
     enrichment:  t.supabaseTeamId
       ? {
           isa:          isaMap.get(t.supabaseTeamId)  ?? null,

@@ -242,16 +242,27 @@ async function fetchJSearch(
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function layer1NamedTeamSearch(): Promise<Layer1Result> {
-  const allTeams = await prisma.top100Team.findMany({ select: { name: true } });
+  const allTeams = await prisma.targetAccount.findMany({ select: { teamName: true, isPriority: true } });
   if (allTeams.length === 0) { console.log("[Layer1] No teams found — skipping"); return { postings: [], rateLimitedCount: 0, covered: 0, total: 0 }; }
 
-  // Shuffle so different teams get covered across runs
-  const shuffled = [...allTeams];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  const batch = shuffled.slice(0, 20);
+  // Build batch: 15 random priority + 5 random non-priority
+  const priority    = allTeams.filter(t => t.isPriority);
+  const nonPriority = allTeams.filter(t => !t.isPriority);
+
+  const shufflePick = <T,>(arr: T[], n: number): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a.slice(0, n);
+  };
+
+  const batch = [
+    ...shufflePick(priority,    Math.min(15, priority.length)),
+    ...shufflePick(nonPriority, Math.min(5,  nonPriority.length)),
+  ];
+  console.log(`[Layer1] Batch: ${Math.min(15, priority.length)} priority + ${Math.min(5, nonPriority.length)} non-priority teams this run`);
 
   const all: RawPosting[]         = [];
   let   totalCollected            = 0;
@@ -259,26 +270,26 @@ async function layer1NamedTeamSearch(): Promise<Layer1Result> {
   let   rateLimitedCount          = 0;
   const zeroResultTeams: string[] = [];
 
-  for (const { name } of batch) {
+  for (const { teamName } of batch) {
     let jobs: JSearchJob[];
     try {
-      jobs = await fetchJSearch(`${name} real estate jobs`, { numPages: 1 });
+      jobs = await fetchJSearch(`${teamName} real estate jobs`, { numPages: 1 });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("rate-limited")) {
-        console.warn(`[Layer1] "${name}" skipped — rate limited after retry`);
+        console.warn(`[Layer1] "${teamName}" skipped — rate limited after retry`);
         rateLimitedCount++;
       } else {
-        console.warn(`[Layer1] "${name}" skipped — ${msg}`);
+        console.warn(`[Layer1] "${teamName}" skipped — ${msg}`);
       }
       await sleep(2000);
       continue;
     }
 
     totalCollected += jobs.length;
-    const matched = jobs.filter(j => fuzzyMatch(name, j.employer_name));
+    const matched = jobs.filter(j => fuzzyMatch(teamName, j.employer_name));
     if (matched.length === 0) {
-      zeroResultTeams.push(name);
+      zeroResultTeams.push(teamName);
     } else {
       totalMatched += matched.length;
       all.push(...matched.map(j => buildPosting(j, true)));
@@ -289,7 +300,7 @@ async function layer1NamedTeamSearch(): Promise<Layer1Result> {
   const zeroMsg = zeroResultTeams.length > 0
     ? `, ${zeroResultTeams.length} teams with 0 results: ${zeroResultTeams.slice(0, 10).join(", ")}${zeroResultTeams.length > 10 ? " …" : ""}`
     : "";
-  console.log(`[Layer1] ${batch.length}/${allTeams.length} teams searched (randomized), ${totalCollected} collected, ${totalMatched} matched${zeroMsg}`);
+  console.log(`[Layer1] ${batch.length}/${allTeams.length} teams searched, ${totalCollected} collected, ${totalMatched} matched${zeroMsg}`);
   return { postings: all, rateLimitedCount, covered: batch.length, total: allTeams.length };
 }
 
@@ -348,22 +359,22 @@ async function layer2ISASearch(): Promise<Layer2Result> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function layer3WebsiteSearch(): Promise<RawPosting[]> {
-  const teams = await prisma.top100Team.findMany({
-    select: { name: true, website: true },
+  const teams = await prisma.targetAccount.findMany({
+    select: { teamName: true, website: true },
     where:  { website: { not: null } },
   });
 
   const all: RawPosting[] = [];
   let   found             = 0;
 
-  for (const { name, website } of teams) {
+  for (const { teamName, website } of teams) {
     if (!website) continue;
 
     const prompt =
       `Search for any current job openings for Inside Sales Agent, ISA, Lead Conversion Specialist, ` +
       `or Inside Sales Manager roles posted on or linked from this real estate team's website: ${website}\n\n` +
       `If any such roles are found, return a JSON array. Each item:\n` +
-      `{ "rawTitle": string, "company": "${name}", "location": string, "state": string (2-letter US code), ` +
+      `{ "rawTitle": string, "company": "${teamName}", "location": string, "state": string (2-letter US code), ` +
       `"sourceUrl": string (direct URL to the job posting or careers page), "postedAt": string (ISO date, use today if not shown) }\n\n` +
       `If no relevant roles found, return an empty array [].\n` +
       `No markdown, no backticks.`;
@@ -380,7 +391,7 @@ async function layer3WebsiteSearch(): Promise<RawPosting[]> {
         const location = r.location || (r.state ? r.state : undefined);
         all.push({
           rawTitle:  r.rawTitle,
-          company:   r.company || name,
+          company:   r.company || teamName,
           location,
           remote:    false,
           url:       r.sourceUrl,
@@ -552,18 +563,20 @@ async function layer5ReMatch(): Promise<number> {
       where:  { isTop100: false, isActive: true },
       select: { id: true, company: true },
     }),
-    prisma.top100Team.findMany({ select: { id: true, name: true } }),
+    prisma.targetAccount.findMany({ select: { id: true, teamName: true, isPriority: true } }),
   ]);
 
   if (teams.length === 0 || postings.length === 0) return 0;
 
-  const matchedPostingIds: number[]           = [];
-  const teamMatches = new Map<number, string>(); // teamId → first matched company
+  const matchedPostingIds: number[]            = [];
+  const priorityPostingIds: number[]           = [];
+  const teamMatches = new Map<string, string>(); // teamId → first matched company
 
   for (const posting of postings) {
     for (const team of teams) {
-      if (fuzzyMatch(team.name, posting.company)) {
+      if (fuzzyMatch(team.teamName, posting.company)) {
         matchedPostingIds.push(posting.id);
+        if (team.isPriority) priorityPostingIds.push(posting.id);
         if (!teamMatches.has(team.id)) teamMatches.set(team.id, posting.company);
         break;
       }
@@ -576,17 +589,23 @@ async function layer5ReMatch(): Promise<number> {
       data:  { isTop100: true },
     });
   }
+  if (priorityPostingIds.length > 0) {
+    await prisma.jobPosting.updateMany({
+      where: { id: { in: priorityPostingIds } },
+      data:  { isPriorityAccount: true },
+    });
+  }
 
   for (const [teamId, matchedName] of teamMatches) {
     try {
-      await prisma.top100Team.update({
+      await prisma.targetAccount.update({
         where: { id: teamId },
         data:  { isMatched: true, matchedName },
       });
-    } catch { /* fields may not exist on older DB */ }
+    } catch { /* skip */ }
   }
 
-  console.log(`[Layer5] Top 100 re-matches: ${matchedPostingIds.length} newly flagged`);
+  console.log(`[Layer5] Re-matches: ${matchedPostingIds.length} flagged isTop100, ${priorityPostingIds.length} flagged isPriorityAccount`);
   return matchedPostingIds.length;
 }
 

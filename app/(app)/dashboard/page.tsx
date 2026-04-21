@@ -95,12 +95,12 @@ export default async function DashboardPage() {
   const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company, p.title]));
 
   // Supabase ISA structure count
-  const [allTop100Teams, supabaseISATeams] = await Promise.all([
-    prisma.top100Team.findMany({ select: { supabaseTeamId: true } }),
+  const [allTargetAccounts, supabaseISATeams] = await Promise.all([
+    prisma.targetAccount.findMany({ select: { supabaseTeamId: true } }),
     getISATeams(),
   ]);
   const isaTeamIdSet           = new Set(supabaseISATeams.map((t) => t.team_id));
-  const confirmedISAStructure  = allTop100Teams.filter(
+  const confirmedISAStructure  = allTargetAccounts.filter(
     (t) => t.supabaseTeamId && isaTeamIdSet.has(t.supabaseTeamId)
   ).length;
 
@@ -143,7 +143,7 @@ export default async function DashboardPage() {
   console.log(`[Dashboard] RealTrends ISA confirmed: ${confirmedISAStructure}`);
   if (targetPostings > activePostings30)    console.warn("[Dashboard] WARNING: Target Account Postings > Active Postings");
   if (activelyHiringTeams > 95)            console.warn("[Dashboard] WARNING: Actively Hiring Teams > 95");
-  if (confirmedISAStructure > allTop100Teams.length) console.warn("[Dashboard] WARNING: RealTrends ISA count > total teams");
+  if (confirmedISAStructure > allTargetAccounts.length) console.warn("[Dashboard] WARNING: RealTrends ISA count > total teams");
 
   return (
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
