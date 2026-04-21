@@ -8,6 +8,8 @@ export const dynamic  = "force-dynamic";
 export const metadata: Metadata = { title: "Target Accounts — RoleRadar" };
 
 export default async function Top100Page() {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
   const [teamsRaw, postingCounts, isaTeams, mktgTeams] = await Promise.all([
     prisma.targetAccount.findMany({
       orderBy: { uploadedAt: "asc" },
@@ -19,7 +21,7 @@ export default async function Top100Page() {
     }),
     prisma.jobPosting.groupBy({
       by:    ["company"],
-      where: { isTop100: true, isActive: true },
+      where: { isTop100: true, isActive: true, scrapedAt: { gte: thirtyDaysAgo } },
       _count: { company: true },
     }),
     getISATeams(),
@@ -27,7 +29,7 @@ export default async function Top100Page() {
   ]);
 
   const latestTitleRows = await prisma.jobPosting.findMany({
-    where:    { isTop100: true, isActive: true },
+    where:    { isTop100: true, isActive: true, scrapedAt: { gte: thirtyDaysAgo } },
     orderBy:  { createdAt: "desc" },
     distinct: ["company"],
     select:   { company: true, title: true },

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { readonlyQuery } from "@/lib/supabase-readonly";
 import {
   LayoutDashboard, Star, ArrowUp, ArrowDown,
   Briefcase, Target, Users, Phone, Sparkles,
@@ -6,7 +7,6 @@ import {
 import Link from "next/link";
 import type { ElementType, ReactNode } from "react";
 import { ScrapeButton } from "./scrape-button";
-import { getISATeams } from "@/lib/supabase-data";
 import { LiveLabel, StaticLabel } from "@/components/source-labels";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +72,7 @@ export default async function DashboardPage() {
       select:  { lastScraped: true },
     }),
     prisma.jobPosting.findMany({
+      where:   { isTop100: true, isActive: true },
       orderBy: { scrapedAt: "desc" },
       take:    10,
       select:  { id: true, title: true, company: true, location: true, url: true, scrapedAt: true, isTop100: true },
@@ -94,15 +95,15 @@ export default async function DashboardPage() {
     : [];
   const latestTitleMap = new Map(latestTitleRows.map((p) => [p.company, p.title]));
 
-  // Supabase ISA structure count
-  const [allTargetAccounts, supabaseISATeams] = await Promise.all([
-    prisma.targetAccount.findMany({ select: { supabaseTeamId: true } }),
-    getISATeams(),
-  ]);
-  const isaTeamIdSet           = new Set(supabaseISATeams.map((t) => t.team_id));
-  const confirmedISAStructure  = allTargetAccounts.filter(
-    (t) => t.supabaseTeamId && isaTeamIdSet.has(t.supabaseTeamId)
-  ).length;
+  // Supabase ISA structure count — cross-reference only linked accounts
+  const allTargetAccounts = await prisma.targetAccount.findMany({ select: { supabaseTeamId: true } });
+  const linkedIds = allTargetAccounts.map((t) => t.supabaseTeamId).filter(Boolean) as string[];
+  const isaRows = linkedIds.length > 0
+    ? await readonlyQuery<{ team_id: string }>(
+        `SELECT team_id FROM mad.isa_teams WHERE team_id = ANY($1::uuid[])`, [linkedIds]
+      ).catch(() => [] as { team_id: string }[])
+    : [];
+  const confirmedISAStructure = isaRows.length;
 
   const trendPct = activePostingsPrior > 0
     ? Math.round(((activePostings30 - activePostingsPrior) / activePostingsPrior) * 100)

@@ -161,25 +161,41 @@ Return: { "skills": ["skill1", "skill2"] }
 }
 
 export async function analyzePatterns(
-  postings: Array<{ title: string; description?: string | null }>
+  postings: Array<{ title: string; description?: string | null }>,
+  verifiedCounts?: {
+    totalActive:  number;
+    isaCount:     number;
+    topRole:      string;
+    topRoleCount: number;
+    topState:     string;
+    topStateCount: number;
+  }
 ): Promise<Array<{ keyword: string; category: string; count: number }>> {
   const combined = postings
     .map((p) => `${p.title}\n${p.description ?? ""}`)
     .join("\n\n")
     .slice(0, 6000);
 
+  const countsBlock = verifiedCounts
+    ? `\nVerified counts from the database — your analysis MUST NOT contradict these:\n` +
+      `- Total active postings: ${verifiedCounts.totalActive}\n` +
+      `- ISA roles: ${verifiedCounts.isaCount} (${Math.round((verifiedCounts.isaCount / Math.max(verifiedCounts.totalActive, 1)) * 100)}% of total)\n` +
+      `- Most common role: ${verifiedCounts.topRole} (${verifiedCounts.topRoleCount} postings)\n` +
+      `- Top state: ${verifiedCounts.topState} (${verifiedCounts.topStateCount} postings)\n`
+    : "";
+
   const result = await generateJSON<{
     patterns: Array<{ keyword: string; category: string; count: number }>;
-  }>(`
-Analyze these job postings and identify the most frequently mentioned skills, tools, languages, and technologies.
+  }>(`Analyze ONLY the job postings provided below. Do not reference external knowledge or historical trends. All insights must come strictly from this dataset.
+${countsBlock}
+Identify the most frequently mentioned skills, tools, technologies, and role types in this real estate job data.
 Return the top 50 patterns, ranked by frequency.
 
 Job postings:
 ${combined}
 
-Return: { "patterns": [{ "keyword": "React", "category": "framework", "count": 12 }] }
-Valid categories: language, framework, platform, database, tool, cloud, domain
-`);
+Return: { "patterns": [{ "keyword": "ISA", "category": "domain", "count": 12 }] }
+Valid categories: language, framework, platform, database, tool, cloud, domain`);
 
   return result.patterns ?? [];
 }

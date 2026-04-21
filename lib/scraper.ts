@@ -32,6 +32,31 @@ const US_STATES = new Set([
   "VA","WA","WV","WI","WY","DC",
 ]);
 
+const STATE_NAMES: Record<string, string> = {
+  "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
+  "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
+  "hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA","kansas":"KS",
+  "kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA",
+  "michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT",
+  "nebraska":"NE","nevada":"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM",
+  "new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK",
+  "oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC",
+  "south dakota":"SD","tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT",
+  "virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
+  "district of columbia":"DC",
+};
+
+function extractStateCode(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (US_STATES.has(s.toUpperCase())) return s.toUpperCase();
+  const lower = s.toLowerCase();
+  if (STATE_NAMES[lower]) return STATE_NAMES[lower];
+  const m = s.match(/,\s*([A-Za-z]{2})\s*(?:\d{5})?$/);
+  if (m && US_STATES.has(m[1].toUpperCase())) return m[1].toUpperCase();
+  return null;
+}
+
 const STRIP_WORDS = new Set([
   "team","group","realty","real","estate","properties","homes",
   "brokerage","associates","llc","inc",
@@ -71,6 +96,7 @@ interface JSearchJob {
   job_posted_at_datetime_utc?: string;
   job_city?:                   string;
   job_state?:                  string;
+  job_location?:               string;
   job_min_salary?:             number;
   job_max_salary?:             number;
   job_salary_period?:          string;
@@ -150,12 +176,20 @@ function formatSalary(job: JSearchJob): string | undefined {
 }
 
 function buildPosting(job: JSearchJob, isTop100: boolean, isPriorityAccount = false): RawPosting {
-  const state    = job.job_state && US_STATES.has(job.job_state) ? job.job_state : "US";
-  const location = [job.job_city, state !== "US" ? state : null].filter(Boolean).join(", ") || undefined;
+  const stateCode =
+    extractStateCode(job.job_state) ??
+    extractStateCode(job.job_city) ??
+    extractStateCode(job.job_location) ??
+    null;
+
+  const location = job.job_city
+    ? [job.job_city, stateCode ?? undefined].filter(Boolean).join(", ")
+    : (stateCode ?? undefined);
+
   return {
     rawTitle:          job.job_title,
     company:           job.employer_name,
-    location,
+    location:          location || undefined,
     remote:            job.job_is_remote ?? false,
     url:               job.job_apply_link,
     description:       job.job_description?.slice(0, 500) ?? undefined,
@@ -456,17 +490,23 @@ async function normalizeRoles(postings: RawPosting[]): Promise<ScrapedPosting[]>
   let   batchCount = 0;
 
   for (let i = 0; i < rawTitles.length; i += BATCH) {
+    const off = i;
     const batch = rawTitles.slice(i, i + BATCH);
     batchCount++;
     try {
       totalGeminiCalls++;
+      const inputs = batch.map((t, i) => ({ title: t, desc: (postings[off + i]?.description ?? "").slice(0, 150) }));
       const results = await generateJSON<NormResult[]>(
-        `Map each of these real estate job titles to the closest match from this list:\n` +
-        `${FIXED_ROLES.join(", ")}\n` +
-        `If no match fits, return 'Other: [short label]'.\n\n` +
-        `Titles: ${JSON.stringify(batch)}\n\n` +
-        `Respond with a JSON array in the same order. ` +
-        `Each item: { normalizedRole: string, confidence: number }\n` +
+        `Map each real estate job title to the MOST SPECIFIC match from this list:\n` +
+        `${FIXED_ROLES.join(", ")}\n\n` +
+        `Rules:\n` +
+        `- Generic "Real Estate Agent" or "Realtor" → "Buyer Agent" if description mentions buyers; "Showing Agent" if mentions showing homes; "Real Estate Agent" only if truly generic.\n` +
+        `- "ISA", "Inside Sales", "Lead Conversion", "Lead Manager" → always "Inside Sales Agent".\n` +
+        `- "TC", "Transaction Coordinator" → always "Transaction Coordinator".\n` +
+        `- Never return an empty string.\n` +
+        `- If no match fits, return "Other: [short label]".\n\n` +
+        `Inputs (JSON array of {title, desc}): ${JSON.stringify(inputs)}\n\n` +
+        `Respond with a JSON array in the same order. Each item: { normalizedRole: string, confidence: number }\n` +
         `No markdown, no backticks.`
       );
       if (Array.isArray(results) && results.length === batch.length) {

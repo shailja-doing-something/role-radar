@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       select: {
         id: true, title: true, company: true, location: true,
         remote: true, url: true, source: true, salary: true,
-        postedAt: true, createdAt: true, isTop100: true, isPriorityAccount: true,
+        postedAt: true, createdAt: true, isTop100: true,
       },
     }),
     prisma.jobPosting.count({ where }),

@@ -19,7 +19,6 @@ interface Posting {
   postedAt:          string | null;
   createdAt:         string;
   isTop100:          boolean;
-  isPriorityAccount: boolean;
 }
 
 interface ApiResponse {
@@ -106,6 +105,7 @@ export default function PostingsPage() {
     const res  = await fetch(`/api/postings?${params}`);
     const json = await res.json() as ApiResponse;
     setData(json);
+    console.log(`[Postings] API response: total=${json.total}, postings=${json.postings?.length ?? 0}`);
     setLoading(false);
   }, [q, source, remote, top100Only, priorityOnly, page]);
 

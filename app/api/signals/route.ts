@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getISATeams, getMarketingOpsTeams } from "@/lib/supabase-data";
+import { readonlyQuery } from "@/lib/supabase-readonly";
 
 // All ISA and ops roles the scraper normalizes to
 const ISA_ROLES = [
@@ -35,22 +35,36 @@ function fuzzyMatch(teamName: string, companyName: string): boolean {
 }
 
 export async function GET() {
-  const [teams, postings, isaTeams, mktgTeams] = await Promise.all([
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [teams, postings] = await Promise.all([
     prisma.targetAccount.findMany({ orderBy: { uploadedAt: "asc" } }),
     prisma.jobPosting.findMany({
-      where: { isTop100: true, isActive: true, title: { in: ISA_ROLES } },
+      where: { isTop100: true, isActive: true, title: { in: ISA_ROLES }, scrapedAt: { gte: thirtyDaysAgo } },
       select: {
         id: true, title: true, company: true,
         location: true, source: true, url: true, postedAt: true, createdAt: true,
       },
       orderBy: { createdAt: "desc" },
     }),
-    getISATeams(),
-    getMarketingOpsTeams(),
   ]);
 
-  const isaSet  = new Set(isaTeams.map((t) => t.team_id));
-  const mktgSet = new Set(mktgTeams.map((t) => t.team_id));
+  // Load only the supabaseTeamIds that are linked, then check against Supabase
+  const linkedIds = teams.map((t) => t.supabaseTeamId).filter(Boolean) as string[];
+
+  const [isaRows, mktgRows] = linkedIds.length > 0
+    ? await Promise.all([
+        readonlyQuery<{ team_id: string }>(
+          `SELECT team_id FROM mad.isa_teams WHERE team_id = ANY($1::uuid[])`, [linkedIds]
+        ).catch(() => [] as { team_id: string }[]),
+        readonlyQuery<{ team_id: string }>(
+          `SELECT team_id FROM mad.marketing_ops_teams WHERE team_id = ANY($1::uuid[])`, [linkedIds]
+        ).catch(() => [] as { team_id: string }[]),
+      ])
+    : [[], []];
+
+  const isaSet  = new Set(isaRows.map((r) => r.team_id));
+  const mktgSet = new Set(mktgRows.map((r) => r.team_id));
 
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
