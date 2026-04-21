@@ -8,17 +8,18 @@ import {
 } from "lucide-react";
 
 interface Posting {
-  id:        number;
-  title:     string;
-  company:   string;
-  location:  string | null;
-  remote:    boolean;
-  salary:    string | null;
-  source:    string;
-  url:       string;
-  postedAt:  string | null;
-  createdAt: string;
-  isTop100:  boolean;
+  id:                number;
+  title:             string;
+  company:           string;
+  location:          string | null;
+  remote:            boolean;
+  salary:            string | null;
+  source:            string;
+  url:               string;
+  postedAt:          string | null;
+  createdAt:         string;
+  isTop100:          boolean;
+  isPriorityAccount: boolean;
 }
 
 interface ApiResponse {
@@ -86,7 +87,8 @@ export default function PostingsPage() {
   const [q,          setQ]          = useState(searchParams.get("company") ?? "");
   const [source,     setSource]     = useState("");
   const [remote,     setRemote]     = useState("");
-  const [top100Only, setTop100Only] = useState(searchParams.get("top100Only") === "true");
+  const [top100Only,    setTop100Only]    = useState(searchParams.get("top100Only") === "true");
+  const [priorityOnly,  setPriorityOnly]  = useState(false);
   const [page,       setPage]       = useState(1);
   const [sources,    setSources]    = useState<string[]>([]);
 
@@ -98,13 +100,14 @@ export default function PostingsPage() {
       ...(q          ? { q }                  : {}),
       ...(source     ? { source }             : {}),
       ...(remote     ? { remote }             : {}),
-      ...(top100Only ? { top100Only: "true" } : {}),
+      ...(top100Only   ? { top100Only:   "true" } : {}),
+      ...(priorityOnly ? { priorityOnly: "true" } : {}),
     });
     const res  = await fetch(`/api/postings?${params}`);
     const json = await res.json() as ApiResponse;
     setData(json);
     setLoading(false);
-  }, [q, source, remote, top100Only, page]);
+  }, [q, source, remote, top100Only, priorityOnly, page]);
 
   useEffect(() => { doFetch(); }, [doFetch]);
 
@@ -115,10 +118,10 @@ export default function PostingsPage() {
   }, []);
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 1;
-  const hasFilters = q || source || remote || top100Only;
+  const hasFilters = q || source || remote || top100Only || priorityOnly;
 
   function clearFilters() {
-    setQ(""); setSource(""); setRemote(""); setTop100Only(false); setPage(1);
+    setQ(""); setSource(""); setRemote(""); setTop100Only(false); setPriorityOnly(false); setPage(1);
   }
 
   return (
@@ -199,6 +202,22 @@ export default function PostingsPage() {
         >
           <Target size={13} />
           Target Accounts Only
+        </button>
+
+        {/* Priority Accounts */}
+        <button
+          type="button"
+          onClick={() => { setPriorityOnly((v) => !v); setPage(1); }}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+            priorityOnly
+              ? "bg-orange-50 border-orange-300 text-orange-600"
+              : "bg-surface border-edge text-fg2 hover:text-ink"
+          }`}
+        >
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priorityOnly ? "bg-orange-100 text-orange-600" : "bg-surface-raised text-fg3"}`}>
+            P
+          </span>
+          Priority Only
         </button>
 
         {hasFilters && (

@@ -168,6 +168,11 @@ function TeamCard({ team }: { team: TeamSignal }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {team.isPriority && (
+            <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 border border-orange-200 text-orange-600 uppercase tracking-wide">
+              Priority
+            </span>
+          )}
           {hasHiring && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-primary">
               ⚡ Outreach Now
@@ -254,10 +259,11 @@ export function SignalsClient() {
   const [teams,   setTeams]   = useState<TeamSignal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [search,         setSearch]         = useState("");
-  const [filterISA,      setFilterISA]      = useState("");
-  const [filterVelocity, setFilterVelocity] = useState("");
-  const [filterMktg,     setFilterMktg]     = useState("");
+  const [search,          setSearch]          = useState("");
+  const [filterISA,       setFilterISA]       = useState("");
+  const [filterVelocity,  setFilterVelocity]  = useState("");
+  const [filterMktg,      setFilterMktg]      = useState("");
+  const [priorityOnly,    setPriorityOnly]    = useState(false);
 
   const loadSignals = useCallback(async () => {
     setLoading(true);
@@ -333,6 +339,7 @@ export function SignalsClient() {
 
   const filtered = teams
     .filter((t) => {
+      if (priorityOnly && !t.isPriority) return false;
       if (search && !t.teamName.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterISA === "Confirmed" && !t.supabaseISAConfirmed)  return false;
       if (filterISA === "Unknown"   &&  t.supabaseISAConfirmed)  return false;
@@ -344,7 +351,7 @@ export function SignalsClient() {
     })
     .sort((a, b) => sortScore(b) - sortScore(a));
 
-  const hasFilter = !!(search || filterISA || filterMktg || filterVelocity);
+  const hasFilter = !!(search || filterISA || filterMktg || filterVelocity || priorityOnly);
 
   const stats = {
     isaPresence:  teams.filter((t) => t.supabaseISAConfirmed).length,
@@ -365,7 +372,7 @@ export function SignalsClient() {
   }
 
   function clearFilters() {
-    setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg("");
+    setSearch(""); setFilterISA(""); setFilterVelocity(""); setFilterMktg(""); setPriorityOnly(false);
   }
 
   return (
@@ -427,6 +434,20 @@ export function SignalsClient() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setPriorityOnly((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+              priorityOnly
+                ? "bg-orange-50 border-orange-300 text-orange-600"
+                : "bg-surface border-edge text-fg2 hover:text-ink"
+            }`}
+          >
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${priorityOnly ? "bg-orange-100 text-orange-600" : "bg-surface-raised text-fg3"}`}>
+              P
+            </span>
+            Priority Only
+          </button>
           <FilterSelect
             label="ISA Presence"
             value={filterISA}

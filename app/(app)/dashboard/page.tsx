@@ -141,8 +141,8 @@ export default async function DashboardPage() {
     ` | ISA%: ${isaPct}%`
   );
   console.log(`[Dashboard] RealTrends ISA confirmed: ${confirmedISAStructure}`);
-  if (targetPostings > activePostings30)    console.warn("[Dashboard] WARNING: Target Account Postings > Active Postings");
-  if (activelyHiringTeams > 95)            console.warn("[Dashboard] WARNING: Actively Hiring Teams > 95");
+  if (targetPostings > activePostings30)                         console.warn("[Dashboard] WARNING: Target Account Postings > Active Postings");
+  if (activelyHiringTeams > allTargetAccounts.length)           console.warn("[Dashboard] WARNING: Actively Hiring Teams > Total Accounts");
   if (confirmedISAStructure > allTargetAccounts.length) console.warn("[Dashboard] WARNING: RealTrends ISA count > total teams");
 
   return (

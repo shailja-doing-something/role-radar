@@ -267,7 +267,7 @@ const FIELD_DEFS: { label: string; key: "teamName"|"brokerage"|"location"|"websi
 
 export function Top100Client({ teams: initial }: { teams: Team[] }) {
   const [teams,      setTeams]      = useState(initial);
-  const [tab,        setTab]        = useState<"matched"|"unmatched">("matched");
+  const [tab,        setTab]        = useState<"hiring"|"all">("hiring");
   const [showDrawer, setShowDrawer] = useState(false);
   const [form,       setForm]       = useState({ teamName: "", brokerage: "", location: "", website: "" });
   const [saving,     setSaving]     = useState(false);
@@ -283,8 +283,8 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
     return () => document.removeEventListener("keydown", h);
   }, [showDrawer]);
 
-  const matched   = teams.filter((t) => t.isMatched || t.roleCount > 0);
-  const unmatched = teams.filter((t) => !t.isMatched && t.roleCount === 0);
+  const hiring    = teams.filter((t) => t.roleCount > 0);
+  const allTeams  = teams;
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -354,13 +354,12 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
       {/* Tabs + Add button */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1 bg-surface border border-edge rounded-lg p-1">
-          {(["matched", "unmatched"] as const).map((t) => {
-            const count  = t === "matched" ? matched.length : unmatched.length;
+          {([["hiring", "Hiring Now", hiring.length], ["all", "All Accounts", allTeams.length]] as const).map(([t, label, count]) => {
             const active = tab === t;
             return (
               <button key={t} type="button" onClick={() => setTab(t)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${active ? "bg-surface-raised text-ink" : "text-fg2 hover:text-ink"}`}>
-                <span className="capitalize">{t}</span>
+                <span>{label}</span>
                 <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${active ? "bg-primary-soft text-primary" : "bg-surface-raised text-fg3"}`}>{count}</span>
               </button>
             );
@@ -372,35 +371,42 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
         </button>
       </div>
 
-      {/* Matched tab */}
-      {tab === "matched" && (
-        matched.length === 0 ? (
+      {/* Hiring Now tab */}
+      {tab === "hiring" && (
+        hiring.length === 0 ? (
           <div className="bg-surface border border-edge rounded-xl py-12 text-center">
             <Flame size={28} className="text-fg3 mx-auto mb-3" />
-            <p className="text-fg2 text-sm">No matched teams yet — run a scrape to find hiring signals</p>
+            <p className="text-fg2 text-sm">No hiring activity yet — run a scrape to find open roles</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            {matched.map((team) => (
+            {hiring.map((team) => (
               <TeamCard key={team.id} team={team} onDelete={handleDelete} deletingId={deletingId} />
             ))}
           </div>
         )
       )}
 
-      {/* Unmatched tab */}
-      {tab === "unmatched" && (
-        unmatched.length === 0 ? (
+      {/* All Accounts tab */}
+      {tab === "all" && (
+        allTeams.length === 0 ? (
           <div className="bg-surface border border-edge rounded-xl py-12 text-center">
-            <p className="text-fg2 text-sm">All teams matched — great coverage!</p>
+            <p className="text-fg2 text-sm">No target accounts yet.</p>
           </div>
         ) : (
           <div className="bg-surface border border-edge rounded-xl overflow-hidden">
             <div className="divide-y divide-edge">
-              {unmatched.map((team) => (
+              {allTeams.map((team) => (
                 <div key={team.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-raised transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-ink text-sm font-medium truncate">{team.teamName}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-ink text-sm font-medium truncate">{team.teamName}</p>
+                      {team.isPriority && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 border border-orange-200 text-orange-600 uppercase tracking-wide shrink-0">
+                          Priority
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 mt-0.5">
                       {team.brokerage && (
                         <span className="flex items-center gap-1 text-fg3 text-xs">
@@ -412,13 +418,14 @@ export function Top100Client({ teams: initial }: { teams: Team[] }) {
                           <MapPin size={10} className="shrink-0" />{team.location}
                         </span>
                       )}
-                      {!team.supabaseTeamId && (
-                        <span className="text-[11px] text-fg3">Not found in RealTrends data</span>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-fg3 text-xs">No postings found</span>
+                    {team.roleCount > 0 ? (
+                      <span className="text-xs font-semibold text-primary">{team.roleCount} open {team.roleCount === 1 ? "role" : "roles"}</span>
+                    ) : (
+                      <span className="text-fg3 text-xs">No active postings</span>
+                    )}
                     <span className="text-fg3 text-xs">{timeAgo(team.uploadedAt)}</span>
                     {team.website && (
                       <a href={team.website.startsWith("http") ? team.website : `https://${team.website}`}

@@ -103,8 +103,9 @@ interface RawPosting {
   description?: string;
   salary?:      string;
   postedAt?:    string;
-  source:       string;
-  isTop100:     boolean;
+  source:            string;
+  isTop100:          boolean;
+  isPriorityAccount?: boolean;
 }
 
 interface ScrapedPosting extends RawPosting {
@@ -148,20 +149,21 @@ function formatSalary(job: JSearchJob): string | undefined {
   return undefined;
 }
 
-function buildPosting(job: JSearchJob, isTop100: boolean): RawPosting {
+function buildPosting(job: JSearchJob, isTop100: boolean, isPriorityAccount = false): RawPosting {
   const state    = job.job_state && US_STATES.has(job.job_state) ? job.job_state : "US";
   const location = [job.job_city, state !== "US" ? state : null].filter(Boolean).join(", ") || undefined;
   return {
-    rawTitle:    job.job_title,
-    company:     job.employer_name,
+    rawTitle:          job.job_title,
+    company:           job.employer_name,
     location,
-    remote:      job.job_is_remote ?? false,
-    url:         job.job_apply_link,
-    description: job.job_description?.slice(0, 500) ?? undefined,
-    salary:      formatSalary(job),
-    postedAt:    job.job_posted_at_datetime_utc ?? new Date().toISOString(),
-    source:      PUBLISHER_TO_SLUG[job.job_publisher] ?? "indeed",
+    remote:            job.job_is_remote ?? false,
+    url:               job.job_apply_link,
+    description:       job.job_description?.slice(0, 500) ?? undefined,
+    salary:            formatSalary(job),
+    postedAt:          job.job_posted_at_datetime_utc ?? new Date().toISOString(),
+    source:            PUBLISHER_TO_SLUG[job.job_publisher] ?? "indeed",
     isTop100,
+    isPriorityAccount,
   };
 }
 
@@ -282,7 +284,7 @@ async function layer1NamedTeamSearch(): Promise<Layer1Result> {
       zeroResultTeams.push(teamName);
     } else {
       totalMatched += matched.length;
-      all.push(...matched.map(j => buildPosting(j, true)));
+      all.push(...matched.map(j => buildPosting(j, true, true)));
     }
     await sleep(2000);
   }
@@ -380,14 +382,15 @@ async function layer3WebsiteSearch(): Promise<RawPosting[]> {
         if (!r.sourceUrl || !r.rawTitle) continue;
         const location = r.location || (r.state ? r.state : undefined);
         all.push({
-          rawTitle:  r.rawTitle,
-          company:   r.company || teamName,
+          rawTitle:          r.rawTitle,
+          company:           r.company || teamName,
           location,
-          remote:    false,
-          url:       r.sourceUrl,
-          postedAt:  r.postedAt || new Date().toISOString(),
-          source:    "website",
-          isTop100:  true,
+          remote:            false,
+          url:               r.sourceUrl,
+          postedAt:          r.postedAt || new Date().toISOString(),
+          source:            "website",
+          isTop100:          true,
+          isPriorityAccount: true,
         });
         found++;
       }
@@ -488,12 +491,15 @@ async function upsertPostings(
   postings:   ScrapedPosting[],
   sourceSlug: string,
 ): Promise<{ created: number; refreshed: number; skipped: number }> {
-  // Dedup by URL — prefer isTop100=true on conflict
+  // Dedup by URL — prefer isPriorityAccount=true, then isTop100=true on conflict
   const seen = new Map<string, ScrapedPosting>();
   for (const p of postings) {
     if (!p.url || !p.title || !p.company) continue;
     const existing = seen.get(p.url);
-    if (!existing || (p.isTop100 && !existing.isTop100)) seen.set(p.url, p);
+    if (!existing) { seen.set(p.url, p); continue; }
+    const winsPriority = p.isPriorityAccount && !existing.isPriorityAccount;
+    const winsTop100   = p.isTop100 && !existing.isTop100 && !existing.isPriorityAccount;
+    if (winsPriority || winsTop100) seen.set(p.url, p);
   }
   const deduped = [...seen.values()];
 
@@ -504,23 +510,25 @@ async function upsertPostings(
       const result = await prisma.jobPosting.upsert({
         where:  { url: posting.url },
         create: {
-          title:       posting.title,
-          company:     posting.company,
-          location:    posting.location    ?? null,
-          remote:      posting.remote      ?? false,
-          url:         posting.url,
-          source:      sourceSlug,
-          description: posting.description ?? null,
-          salary:      posting.salary      ?? null,
-          postedAt:    posting.postedAt    ? new Date(posting.postedAt) : null,
-          isActive:    true,
-          isTop100:    posting.isTop100,
-          scrapedAt:   new Date(),
+          title:             posting.title,
+          company:           posting.company,
+          location:          posting.location    ?? null,
+          remote:            posting.remote      ?? false,
+          url:               posting.url,
+          source:            sourceSlug,
+          description:       posting.description ?? null,
+          salary:            posting.salary      ?? null,
+          postedAt:          posting.postedAt    ? new Date(posting.postedAt) : null,
+          isActive:          true,
+          isTop100:          posting.isTop100,
+          isPriorityAccount: posting.isPriorityAccount ?? false,
+          scrapedAt:         new Date(),
         },
         update: {
           isActive:  true,
           scrapedAt: new Date(),
-          ...(posting.isTop100 ? { isTop100: true } : {}),
+          ...(posting.isTop100          ? { isTop100:          true } : {}),
+          ...(posting.isPriorityAccount ? { isPriorityAccount: true } : {}),
         },
         select: { createdAt: true, updatedAt: true },
       });
@@ -659,7 +667,10 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
     for (const p of [...l1, ...l2]) {
       if (!p.url) continue;
       const ex = jMap.get(p.url);
-      if (!ex || (p.isTop100 && !ex.isTop100)) jMap.set(p.url, p);
+      if (!ex) { jMap.set(p.url, p); continue; }
+      const winsPriority = p.isPriorityAccount && !ex.isPriorityAccount;
+      const winsTop100   = p.isTop100 && !ex.isTop100 && !ex.isPriorityAccount;
+      if (winsPriority || winsTop100) jMap.set(p.url, p);
     }
     const jsearchRaw = [...jMap.values()];
     if (jsearchRaw.length > 0) {
@@ -683,7 +694,10 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
   for (const p of [...l1, ...l2, ...l3, ...l4]) {
     if (!p.url) continue;
     const ex = urlMap.get(p.url);
-    if (!ex || (p.isTop100 && !ex.isTop100)) urlMap.set(p.url, p);
+    if (!ex) { urlMap.set(p.url, p); continue; }
+    const winsPriority = p.isPriorityAccount && !ex.isPriorityAccount;
+    const winsTop100   = p.isTop100 && !ex.isTop100 && !ex.isPriorityAccount;
+    if (winsPriority || winsTop100) urlMap.set(p.url, p);
   }
   const combined = [...urlMap.values()];
   console.log(
@@ -760,6 +774,39 @@ async function _scrapeAll(skipJSearch = false): Promise<void> {
   console.log(`[Scraper] Save: ${totalNew} new, ${totalUpdated} updated, ${totalSkipped} duplicates skipped`);
   console.log(`[Scraper] Total JSearch calls: ${totalJSearchCalls}`);
   console.log(`[Scraper] Total Gemini calls:  ${totalGeminiCalls}`);
+
+  // ── Validation log ────────────────────────────────────────────────────────
+  const [
+    totalAccounts,
+    priorityAccounts,
+    linkedAccounts,
+    matchedAccounts,
+    totalPostings,
+    top100Postings,
+    priorityPostings,
+  ] = await Promise.all([
+    prisma.targetAccount.count(),
+    prisma.targetAccount.count({ where: { isPriority: true } }),
+    prisma.targetAccount.count({ where: { supabaseTeamId: { not: null } } }),
+    prisma.targetAccount.count({ where: { isMatched: true } }),
+    prisma.jobPosting.count({ where: { isActive: true } }),
+    prisma.jobPosting.count({ where: { isActive: true, isTop100: true } }),
+    prisma.jobPosting.count({ where: { isActive: true, isPriorityAccount: true } }),
+  ]);
+  console.log(
+    `[Validate] Accounts: ${totalAccounts} total | ${priorityAccounts} priority` +
+    ` | ${linkedAccounts} Supabase-linked | ${matchedAccounts} matched`
+  );
+  console.log(
+    `[Validate] Postings: ${totalPostings} active | ${top100Postings} isTop100` +
+    ` | ${priorityPostings} isPriorityAccount`
+  );
+  if (priorityAccounts !== totalAccounts)
+    console.warn(`[Validate] WARNING: ${totalAccounts - priorityAccounts} accounts missing isPriority=true`);
+  if (priorityPostings > top100Postings)
+    console.warn("[Validate] WARNING: isPriorityAccount > isTop100 — re-check Layer 5 logic");
+  if (top100Postings > totalPostings)
+    console.warn("[Validate] WARNING: isTop100 count exceeds total active postings");
 
   const totalRateLimited = l1Result.rateLimitedCount + l2Result.rateLimitedCount;
   const runStatus = totalRateLimited > 0 ? "partial" : "success";
