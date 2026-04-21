@@ -11,10 +11,23 @@ import { LiveLabel, StaticLabel } from "@/components/source-labels";
 
 export const dynamic = "force-dynamic";
 
+const ISA_ROLES = [
+  "Inside Sales Agent",
+  "Real Estate Team Lead",
+  "Transaction Coordinator",
+  "Real Estate Operations Manager",
+  "Listing Coordinator",
+  "Real Estate Marketing Manager",
+  "Real Estate Administrative Assistant",
+];
+
 export default async function DashboardPage() {
-  const now          = Date.now();
-  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysAgo  = new Date(now - 60 * 24 * 60 * 60 * 1000);
+  const now             = Date.now();
+  const thirtyDaysAgo   = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo    = new Date(now - 60 * 24 * 60 * 60 * 1000);
+
+  const BASE   = { isActive: true, scrapedAt: { gte: thirtyDaysAgo } } as const;
+  const PRIOR  = { isActive: true, scrapedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } as const;
 
   const [
     activePostings30,
@@ -29,40 +42,27 @@ export default async function DashboardPage() {
     recentPostings,
     lastScrapeRun,
   ] = await Promise.all([
-    prisma.jobPosting.count({
-      where: { isActive: true, createdAt: { gte: thirtyDaysAgo } },
-    }),
-    prisma.jobPosting.count({
-      where: { isActive: true, createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
-    }),
-    prisma.jobPosting.count({ where: { isTop100: true, isActive: true } }),
-    prisma.jobPosting.count({
-      where: {
-        isActive: true,
-        OR: [
-          { title: { contains: "Inside Sales", mode: "insensitive" } },
-          { title: { startsWith: "ISA",        mode: "insensitive" } },
-        ],
-      },
-    }),
+    prisma.jobPosting.count({ where: BASE }),
+    prisma.jobPosting.count({ where: PRIOR }),
+    prisma.jobPosting.count({ where: { ...BASE, isTop100: true } }),
+    prisma.jobPosting.count({ where: { ...BASE, title: { in: ISA_ROLES } } }),
     prisma.jobPosting.findMany({
-      where:   { isActive: true, location: { not: null } },
-      select:  { location: true },
-      take:    500,
+      where:  { ...BASE, location: { not: null } },
+      select: { location: true },
     }),
     prisma.jobPosting.groupBy({
       by:      ["title"],
-      where:   { isActive: true },
+      where:   BASE,
       _count:  { title: true },
       orderBy: { _count: { title: "desc" } },
       take:    1,
     }),
-    prisma.jobPosting.count({ where: { isActive: true } }),
+    prisma.jobPosting.count({ where: BASE }),
     prisma.jobPosting.groupBy({
       by:      ["company"],
-      where:   { isTop100: true, isActive: true },
+      where:   { ...BASE, isTop100: true },
       _count:  { company: true },
-      _max:    { createdAt: true },
+      _max:    { scrapedAt: true },
       orderBy: { _count: { company: "desc" } },
       take:    8,
     }),
@@ -86,8 +86,8 @@ export default async function DashboardPage() {
   const targetCompanyNames = targetTeamActivity.map((t) => t.company);
   const latestTitleRows = targetCompanyNames.length > 0
     ? await prisma.jobPosting.findMany({
-        where:    { company: { in: targetCompanyNames }, isTop100: true, isActive: true },
-        orderBy:  { createdAt: "desc" },
+        where:    { company: { in: targetCompanyNames }, ...BASE, isTop100: true },
+        orderBy:  { scrapedAt: "desc" },
         distinct: ["company"],
         select:   { company: true, title: true },
       })
@@ -119,7 +119,9 @@ export default async function DashboardPage() {
   const stateCounts: Record<string, number> = {};
   for (const p of locationPostings) {
     if (!p.location) continue;
-    const m = p.location.match(/,\s*([A-Z]{2})(?:\s|$)/);
+    // Match "City, ST" or "City, ST 12345" or bare "ST" at end
+    const m = p.location.match(/,\s*([A-Z]{2})(?:\s|$|,)/) ??
+              p.location.match(/\b([A-Z]{2})$/);
     if (m) stateCounts[m[1]] = (stateCounts[m[1]] ?? 0) + 1;
   }
   const topStateEntry = Object.entries(stateCounts).sort(([, a], [, b]) => b - a)[0] ?? null;
@@ -127,6 +129,16 @@ export default async function DashboardPage() {
   const topTeam  = targetTeamActivity[0] ?? null;
   const isaPct   = totalActive > 0 ? Math.round((isaCount / totalActive) * 100) : 0;
   const isaAbove = isaPct >= 30;
+
+  console.log("[Dashboard]", {
+    activePostings30,
+    targetPostings,
+    isaCount,
+    activelyHiringTeams: targetTeamActivity.length,
+    totalActive,
+    isaPct,
+    confirmedISAStructure,
+  });
 
   return (
     <div className="px-10 pt-10 pb-16 max-w-[1280px] mx-auto">
@@ -289,7 +301,7 @@ export default async function DashboardPage() {
                       {t._count.company} {t._count.company === 1 ? "role" : "roles"}
                     </span>
                     <span className="text-xs text-fg3 whitespace-nowrap">
-                      {timeAgo(t._max.createdAt?.toISOString() ?? null)}
+                      {timeAgo(t._max.scrapedAt?.toISOString() ?? null)}
                     </span>
                   </div>
                 </Link>
